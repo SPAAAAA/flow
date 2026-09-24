@@ -123,7 +123,13 @@
 
   /* ---------------- founder badge ---------------- */
   F.isFounder = (w) => !!w && (CFG.founders || []).includes(w);
-  F.founderBadge = (w, small) => (F.isFounder(w) ? `<span class="founder${small ? " sm" : ""}" title="Founder of ${F.esc(CFG.siteName)}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z"/></svg>FOUNDER</span>` : "");
+  // Styles are inline so the badge always looks right, even if an old stylesheet is cached.
+  F.founderBadge = (w, small) => {
+    if (!F.isFounder(w)) return "";
+    const sz = small ? 10 : 13;
+    const st = `display:inline-flex;align-items:center;gap:${small ? 3 : 5}px;padding:${small ? "1px 6px 1px 5px" : "3px 10px 3px 8px"};border-radius:999px;font-size:${small ? 9.5 : 12}px;line-height:1.4;font-weight:800;letter-spacing:.07em;vertical-align:middle;white-space:nowrap;flex:none;color:#1a1300;background:linear-gradient(135deg,#ffe58a,#ffb800 55%,#ffd24d);box-shadow:0 0 0 1px rgba(255,210,77,.6),0 0 18px -4px rgba(255,184,0,.7)`;
+    return `<span class="founder${small ? " sm" : ""}" style="${st}" title="Founder of ${F.esc(CFG.siteName)}"><svg width="${sz}" height="${sz}" style="width:${sz}px;height:${sz}px;flex:none" viewBox="0 0 24 24" fill="currentColor"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z"/></svg>FOUNDER</span>`;
+  };
 
   /* ---------------- toasts ---------------- */
   F.toast = (title, msg = "", type = "") => {
