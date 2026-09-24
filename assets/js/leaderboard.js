@@ -8,6 +8,7 @@
     { id: "gainers", label: "Top gainers 24h" },
     { id: "volume", label: "Most traded" },
     { id: "traders", label: "Top traders" },
+    { id: "members", label: "Online members" },
   ];
   const S = { tab: F.qs("tab") || "mcap", coins: null, traders: null, err: null };
   if (!TABS.some((t) => t.id === S.tab)) S.tab = "mcap";
@@ -37,6 +38,7 @@
     F.$$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.t === S.tab));
     const body = F.$("#body"), pod = F.$("#podium");
     if (S.tab === "traders") return renderTraders();
+    if (S.tab === "members") return renderMembers();
     F.$("#sub").textContent = "Live Solana meme coins tracked by FLOW";
     if (S.err) { pod.innerHTML = ""; body.innerHTML = `<div class="empty-state"><b>Couldn't load</b>${F.esc(S.err)}</div>`; return; }
     if (!S.coins) { pod.innerHTML = ""; body.innerHTML = `<div class="skeleton" style="height:400px"></div>`; return; }
@@ -78,16 +80,46 @@
     }
     const list = S.traders.sort((a, b) => b.vol - a.vol).slice(0, 50);
     if (!list.length) { pod.innerHTML = ""; body.innerHTML = `<div class="empty-state"><b>No trader data yet</b>Try again in a moment.</div>`; return; }
-    pod.innerHTML = podium(list, (t) => F.avatar(t.addr), (t) => `<span class="mono">${F.short(t.addr)}</span>`, (t) => `<b>${F.usd(t.vol)}</b> <span class="muted">volume</span>`, (t) => "profile.html?a=" + t.addr);
+    pod.innerHTML = podium(list, (t) => F.avatar(t.addr), (t) => `<span class="mono" data-wname="${t.addr}">${F.short(t.addr)}</span>`, (t) => `<b>${F.usd(t.vol)}</b> <span class="muted">volume</span>`, (t) => "profile.html?a=" + t.addr);
     body.innerHTML = `<div class="table-wrap"><table class="t"><thead><tr><th>#</th><th>Trader</th><th class="num">Volume</th><th class="num">Trades</th><th class="num">Bought</th><th class="num">Sold</th><th>Coins</th></tr></thead><tbody>
       ${list.map((t, i) => `<tr data-href="profile.html?a=${t.addr}" style="cursor:pointer"><td class="rank-num">${i + 1}</td>
-        <td><div class="coin-cell"><img src="${F.avatar(t.addr)}" alt="" style="border-radius:50%"><span class="mono">${F.short(t.addr, 5)}</span></div></td>
+        <td><div class="coin-cell"><img src="${F.avatar(t.addr)}" data-wavatar="${t.addr}" alt="" style="border-radius:50%"><span class="mono" data-wname="${t.addr}">${F.short(t.addr, 5)}</span></div></td>
         <td class="num"><b>${F.usd(t.vol)}</b></td><td class="num">${t.n}</td><td class="num up">${F.usd(t.buy)}</td><td class="num down">${F.usd(t.sell)}</td>
         <td class="muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${[...t.coins].slice(0, 4).map((s) => "$" + F.esc(s)).join(", ")}</td></tr>`).join("")}
       </tbody></table></div>${partial ? '<p class="note">Still collecting trades…</p>' : ""}`;
+    F.$$(".podium img", pod).forEach((im, i) => { const a = pod.querySelectorAll("[data-wname]")[i]?.dataset.wname; if (a) im.dataset.wavatar = a; });
+    if (!partial) { F.fillNames(pod); F.fillNames(body); }
   }
 
+  /* ---------- online members ---------- */
+  async function renderMembers() {
+    const body = F.$("#body"), pod = F.$("#podium");
+    pod.innerHTML = "";
+    if (!F.auth.enabled) { F.$("#sub").textContent = ""; body.innerHTML = `<div class="empty-state"><b>Members aren't set up yet</b>Connect Supabase in config.js to show who's online.</div>`; return; }
+    const online = [...F.online.values()];
+    F.$("#sub").textContent = `${online.length} member${online.length === 1 ? "" : "s"} online now`;
+    const card = (m, on) => `<a class="member" href="profile.html?a=${F.esc(m.wallet)}">
+      <div class="avatar-wrap"><img src="${F.esc(m.avatar || m.avatar_url || F.avatar(m.wallet))}" alt="">${on ? '<span class="online-dot" style="position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border:2px solid var(--panel);margin:0"></span>' : ""}</div>
+      <div style="min-width:0"><div class="n">${F.esc(m.name || F.short(m.wallet))}${F.auth.isMe(m.wallet) ? ' <span class="badge blue">You</span>' : ""}</div>
+      <div class="s">${on ? "Online now" : "Last seen " + F.ago(Date.parse(m.last_seen)) + " ago"}</div></div></a>`;
+    const signInCta = !F.auth.profile ? `<div class="empty-state" style="margin-bottom:16px;padding:22px"><b>Want to show up here?</b>Sign in with your wallet — it's free and only proves you own it.<div style="margin-top:12px"><button class="btn btn-primary" id="mem-signin">${F.wallet.connected ? "Sign in with wallet" : "Connect wallet"}</button></div></div>` : "";
+    body.innerHTML = `${signInCta}
+      <h3 style="margin:0 0 12px;font-size:15px"><span class="online-dot"></span>Online now</h3>
+      ${online.length ? `<div class="members">${online.sort((a, b) => (a.name || "~").localeCompare(b.name || "~")).map((m) => card(m, true)).join("")}</div>` : `<div class="empty-state"><b>Nobody signed in right now</b>Members appear here the moment they're on ${F.esc(F.cfg.siteName)}.</div>`}
+      <h3 style="margin:26px 0 12px;font-size:15px">Recently active</h3><div id="recent"><div class="skeleton" style="height:120px"></div></div>`;
+    const b = F.$("#mem-signin"); if (b) b.onclick = F.auth.signIn;
+    const { data } = await F.sb.from("profiles").select("wallet,name,avatar_url,last_seen").order("last_seen", { ascending: false }).limit(60);
+    if (S.tab !== "members") return;
+    const rest = (data || []).filter((m) => !F.online.has(m.wallet));
+    F.$("#recent").innerHTML = rest.length ? `<div class="members">${rest.map((m) => card(m, false)).join("")}</div>` : `<p class="muted">No other members yet.</p>`;
+  }
+  let memT;
+  const rerenderMembers = () => { if (S.tab === "members") { clearTimeout(memT); memT = setTimeout(renderMembers, 300); } };
+  document.addEventListener("flow:online", rerenderMembers);
+  document.addEventListener("flow:auth", rerenderMembers);
+
   (async () => {
+    if (S.tab === "members") render();
     try { S.coins = await F.loadUniverse(); } catch (e) { S.err = e.message; }
     render();
   })();

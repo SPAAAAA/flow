@@ -112,6 +112,11 @@
     discord: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 5.3A18 18 0 0 0 15.6 4l-.6 1.1a16.6 16.6 0 0 0-5 0L9.4 4A18 18 0 0 0 5 5.3 18.6 18.6 0 0 0 1.8 17.9 18 18 0 0 0 7.3 20.7l1.2-1.9a11 11 0 0 1-1.9-.9l.5-.4a12.9 12.9 0 0 0 11 0l.5.4-1.9.9 1.2 1.9a18 18 0 0 0 5.5-2.8A18.5 18.5 0 0 0 20 5.3zM8.7 15.3c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2zm6.6 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2z"/></svg>',
     globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
     logout: I('<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>'),
+    close: I('<path d="M6 6l12 12M18 6 6 18"/>'),
+    chat: I('<path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"/>'),
+    send: I('<path d="m4 12 16-8-6 16-2.5-6.5z"/>'),
+    edit: I('<path d="M4 20h4L19 9l-4-4L4 16z"/>'),
+    users: I('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>'),
     refresh: I('<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>'),
   };
   F.logo = `<svg viewBox="0 0 32 32" fill="none"><path d="M4 12c4-5 8-5 12 0s8 5 12 0" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/><path d="M4 20c4-5 8-5 12 0s8 5 12 0" stroke="#fff" stroke-opacity=".6" stroke-width="3.2" stroke-linecap="round"/></svg>`;

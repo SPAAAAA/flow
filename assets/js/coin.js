@@ -223,12 +223,13 @@
     const quoteSym = S.coin.quote?.symbol || "SOL";
     b.innerHTML = `<div class="table-wrap" style="border:0;background:none"><table class="t" style="min-width:640px"><thead><tr><th>Account</th><th>Type</th><th class="num">${quoteSym}</th><th class="num">${F.esc(S.coin.symbol)}</th><th class="num">USD</th><th class="num">Price</th><th class="num">Time</th><th class="num">Tx</th></tr></thead><tbody>
       ${S.trades.slice(0, 50).map((t) => `<tr>
-        <td><a href="profile.html?a=${t.trader}" style="display:flex;align-items:center;gap:8px"><img src="${F.avatar(t.trader)}" alt="" style="width:20px;height:20px;border-radius:50%"><span class="mono">${F.short(t.trader)}</span></a></td>
+        <td><a href="profile.html?a=${t.trader}" style="display:flex;align-items:center;gap:8px"><img src="${F.avatar(t.trader)}" data-wavatar="${t.trader}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover"><span class="mono" data-wname="${t.trader}">${F.short(t.trader)}</span></a></td>
         <td><span class="${t.kind === "buy" ? "up" : "down"}" style="font-weight:700">${t.kind === "buy" ? "Buy" : "Sell"}</span></td>
         <td class="num">${F.num(t.quoteAmt, 3)}</td><td class="num">${F.num(t.tokenAmt)}</td><td class="num">${F.usd(t.usd)}</td><td class="num">${F.price(t.price)}</td>
         <td class="num muted">${F.ago(t.time)}</td>
         <td class="num"><a href="${F.solscanTx(t.tx)}" target="_blank" rel="noopener" class="muted">${F.icons.ext.replace("<svg", '<svg width="14" height="14"')}</a></td></tr>`).join("")}
     </tbody></table></div>`;
+    F.fillNames(b);
   }
   async function loadHolders() {
     const b = F.$("#tabbody");

@@ -41,6 +41,12 @@ window.FLOW_CONFIG = {
   // Only used to draw progress bars for coins still on the curve.
   graduationMcapUsd: 69000,
 
+  // Supabase (global chat, member profiles, who's online).
+  // From your Supabase project → Project Settings → API. The anon/publishable
+  // key is safe to put in the browser — access is protected by the database rules.
+  supabaseUrl: "https://jdsgoxjnavuyyvnrwosw.supabase.co",
+  supabaseAnonKey: "sb_publishable_3sQSPPULWJjuxqFpcDXLpA_XT9bH63M",
+
   // Social links in the sidebar (leave "" to hide)
   socials: { x: "", telegram: "", discord: "" }
 };

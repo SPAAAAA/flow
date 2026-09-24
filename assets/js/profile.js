@@ -18,16 +18,16 @@
   }
 
   function shell() {
-    const mine = F.wallet.pubkey === addr;
     document.title = `${F.short(addr)} — ${F.cfg.siteName}`;
     root.innerHTML = `
       <div class="profile-head">
-        <img class="avatar" src="${F.avatar(addr)}" alt="">
+        <div class="avatar-wrap"><img class="avatar" id="pav" src="${F.avatar(addr)}" alt=""><span class="online-dot hidden" id="pdot" title="Online now"></span></div>
         <div>
-          <h1>${F.short(addr, 6)} ${mine ? '<span class="badge blue">You</span>' : ""}</h1>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="copy" id="cp">${F.short(addr, 10)} ${F.icons.copy}</button></div>
+          <h1 id="pname">${F.short(addr, 6)}</h1>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="copy" id="cp">${F.short(addr, 10)} ${F.icons.copy}</button><span class="muted" style="font-size:12px" id="psince"></span></div>
         </div>
         <div class="actions">
+          <span id="pedit"></span>
           <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
@@ -116,11 +116,70 @@
   function start() {
     if (!addr) { if (F.wallet.pubkey) addr = F.wallet.pubkey; else return prompt(); }
     if (!F.isAddress(addr)) { root.innerHTML = `<div class="empty-state"><b>Invalid address</b>That doesn't look like a Solana wallet address.</div>`; return; }
-    shell(); renderCoins(); load();
+    shell(); renderCoins(); load(); loadMember();
   }
+
+  /* ---------- member identity (name, picture, online) ---------- */
+  let member = null;
+  async function loadMember() {
+    if (F.auth.enabled) { try { member = await F.profiles.byWallet(addr); } catch {} }
+    if (F.auth.isMe?.(addr)) member = F.auth.profile;
+    renderIdentity();
+    if (F.qs("edit") && !openedEdit) { openedEdit = true; if (F.auth.isMe?.(addr)) openEdit(); }
+  }
+  let openedEdit = false;
+  function renderIdentity() {
+    if (!F.$("#pname")) return;
+    const me = F.auth.isMe?.(addr), connectedHere = F.wallet.pubkey === addr;
+    F.$("#pname").innerHTML = `${member?.name ? F.esc(member.name) : F.short(addr, 6)} ${me || connectedHere ? '<span class="badge blue">You</span>' : ""}`;
+    F.$("#pav").src = member?.avatar_url || F.avatar(addr);
+    F.$("#psince").textContent = member ? `Member since ${new Date(member.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : "";
+    F.$("#pdot").classList.toggle("hidden", !F.online.has(addr));
+    if (member?.name) document.title = `${member.name} — ${F.cfg.siteName}`;
+    const ed = F.$("#pedit");
+    if (!F.auth.enabled) ed.innerHTML = "";
+    else if (me) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Edit profile</button>`; F.$("#edit-btn").onclick = openEdit; }
+    else if (connectedHere) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Sign in to edit</button>`; F.$("#edit-btn").onclick = async () => { await F.auth.signIn(); if (F.auth.isMe(addr)) { member = F.auth.profile; renderIdentity(); openEdit(); } }; }
+    else ed.innerHTML = "";
+  }
+  function openEdit() {
+    const p = F.auth.profile; if (!p) return;
+    let file = null;
+    const m = F.h(`<div class="modal-bg"><div class="modal">
+      <h3>Edit profile</h3><p>Your name and picture show in chat, on the leaderboard and on your profile.</p>
+      <label class="edit-avatar" title="Change picture"><img id="ea-img" src="${F.avatarOf(p)}" alt=""><span>${F.icons.edit}</span><input type="file" accept="image/*" id="ea-file" hidden></label>
+      <label class="label" for="ea-name">Display name</label>
+      <input class="input" id="ea-name" maxlength="20" placeholder="e.g. moonboy" value="${F.esc(p.name || "")}">
+      <p class="note" style="margin:6px 0 16px">2–20 characters: letters, numbers, spaces, _ . -</p>
+      <div style="display:flex;gap:8px">
+        ${p.avatar_url ? '<button class="btn btn-ghost" id="ea-rm">Remove picture</button>' : ""}
+        <span style="flex:1"></span><button class="btn btn-ghost" id="ea-cancel">Cancel</button><button class="btn btn-primary" id="ea-save">Save</button>
+      </div></div></div>`);
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.addEventListener("click", (e) => { if (e.target === m) close(); });
+    F.$("#ea-cancel", m).onclick = close;
+    F.$("#ea-file", m).onchange = (e) => { file = e.target.files[0]; if (file) F.$("#ea-img", m).src = URL.createObjectURL(file); };
+    let removePic = false;
+    const rm = F.$("#ea-rm", m); if (rm) rm.onclick = () => { removePic = true; file = null; F.$("#ea-img", m).src = F.avatar(p.wallet); rm.remove(); };
+    F.$("#ea-save", m).onclick = async () => {
+      const btn = F.$("#ea-save", m); btn.disabled = true; btn.textContent = "Saving…";
+      try {
+        const fields = {};
+        const name = F.$("#ea-name", m).value.trim().replace(/\s+/g, " ");
+        if (name !== (p.name || "")) fields.name = name || null;
+        if (file) fields.avatar_url = await F.auth.uploadAvatar(file);
+        else if (removePic) fields.avatar_url = null;
+        if (Object.keys(fields).length) member = await F.auth.updateProfile(fields);
+        renderIdentity(); close(); F.toast("Profile saved");
+      } catch (e) { F.toast("Couldn't save", F.esc(e.message), "err"); btn.disabled = false; btn.textContent = "Save"; }
+    };
+  }
+  document.addEventListener("flow:auth", () => { if (addr) { if (F.auth.isMe(addr)) member = F.auth.profile; renderIdentity(); } });
+  document.addEventListener("flow:online", () => { const d = F.$("#pdot"); if (d) d.classList.toggle("hidden", !F.online.has(addr)); });
   document.addEventListener("flow:wallet", () => {
-    if (!F.qs("a") && F.wallet.pubkey && addr !== F.wallet.pubkey) { addr = F.wallet.pubkey; S.holdings = null; S.sigs = null; start(); }
-    else if (addr) { const h = F.$(".profile-head h1"); if (h) h.innerHTML = `${F.short(addr, 6)} ${F.wallet.pubkey === addr ? '<span class="badge blue">You</span>' : ""}`; }
+    if (!F.qs("a") && F.wallet.pubkey && addr !== F.wallet.pubkey) { addr = F.wallet.pubkey; S.holdings = null; S.sigs = null; member = null; start(); }
+    else if (addr) renderIdentity();
   });
   start();
 })();
