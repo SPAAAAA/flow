@@ -38,6 +38,18 @@ The public Solana endpoint **blocks requests from browsers**. Without your own e
 3. Paste it into `assets/js/config.js` as `rpcUrl`.
 4. In the Helius dashboard, restrict the key to your site's domain (for example `you.github.io`), so nobody else can use up your quota. The key is visible in the site's source, which is normal for browser RPC keys. The domain restriction is what protects it.
 
+## Chat, profiles and online members (Supabase)
+
+The global chat, editable names and profile pictures, and the **Online members** leaderboard tab all run on a free Supabase project, which is already connected in `config.js`.
+
+- Users sign in by signing a free message in their wallet (Sign in with Solana). This proves they own the wallet, so nobody can post under someone else's name or edit their profile.
+- The database layout and security rules are in `supabase/schema.sql`. Run it again in the Supabase SQL Editor if you ever start a fresh project.
+- **Make yourself admin**, so you can delete any chat message. First sign in on FLOW once, then run this in the SQL Editor:
+  `update public.profiles set is_admin = true where wallet = 'YOUR_WALLET';`
+- **Ban someone:** `update public.profiles set banned = true where wallet = 'THEIR_WALLET';`
+- Chat has a 3-second slow mode. Messages can be up to 400 characters, and profile pictures are resized to 256 px.
+- Free-plan projects pause after about a week with no visitors. Open the Supabase dashboard to resume it.
+
 ## Settings (`assets/js/config.js`)
 
 | Setting | Meaning |
@@ -77,5 +89,4 @@ All of these are free public APIs with rate limits. For a large audience, consid
 ## Things to know before launch
 
 - **Legal:** in the EU, and in the Netherlands in particular, offering crypto trading services can fall under MiCA or AFM rules, especially if you charge fees. Get advice from a lawyer before launching publicly. The terms on `about.html` are a starting template, not legal advice.
-- **Comments and replies** (like pump.fun threads) need a backend and moderation, so they're not included.
 - Test with small amounts first. Phantom works best on desktop, and on mobile inside Phantom's built-in browser.
