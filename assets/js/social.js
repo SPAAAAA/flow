@@ -190,10 +190,13 @@
       renderFoot();
       document.addEventListener("flow:auth", renderFoot);
       document.addEventListener("flow:wallet", renderFoot);
-      document.addEventListener("flow:online", () => {
+      const showOnline = () => {
+        if (F.onlineVisitors == null) return;
         const n = F.online.size, v = F.onlineVisitors || 0;
         F.$("#chat-online").innerHTML = `<span class="online-dot"></span>${n} member${n === 1 ? "" : "s"} online · ${v} viewing`;
-      });
+      };
+      document.addEventListener("flow:online", showOnline);
+      showOnline();
       if (enabled) loadMessages();
     };
     start();
