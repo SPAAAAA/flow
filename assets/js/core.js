@@ -490,6 +490,7 @@
   const NAV = [
     { href: "index.html", label: "Home", icon: "home", key: "home" },
     { href: "leaderboard.html", label: "Leaderboard", icon: "trophy", key: "leaderboard" },
+    { href: "post.html", label: "Post", icon: "edit", key: "post" },
     { href: "index.html?tab=watchlist", label: "Watchlist", icon: "star", key: "watchlist" },
     { href: "profile.html", label: "Profile", icon: "user", key: "profile" },
     { href: "about.html", label: "How it works", icon: "info", key: "about" },

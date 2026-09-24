@@ -34,7 +34,7 @@
       </div>
       <div class="kpis" id="kpis">${Array(4).fill('<div class="skeleton" style="height:66px"></div>').join("")}</div>
       <div class="panel">
-        <div class="subtabs" id="tabs"><button data-t="coins" class="active">Coins held</button><button data-t="activity">Activity</button></div>
+        <div class="subtabs" id="tabs"><button data-t="coins" class="active">Coins held</button><button data-t="posts">Posts</button><button data-t="activity">Activity</button></div>
         <div id="body"></div>
       </div>`;
     F.$("#cp").onclick = () => F.copy(addr, "Address copied");
@@ -42,7 +42,9 @@
     F.$("#tabs").onclick = (e) => {
       const b = e.target.closest("[data-t]"); if (!b) return;
       S.tab = b.dataset.t; F.$$("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
-      S.tab === "coins" ? renderCoins() : loadActivity();
+      if (S.tab === "coins") renderCoins();
+      else if (S.tab === "posts") showPosts();
+      else loadActivity();
     };
   }
 
@@ -128,6 +130,14 @@
     if (F.qs("edit") && !openedEdit) { openedEdit = true; if (F.auth.isMe?.(addr)) openEdit(); }
   }
   let openedEdit = false;
+  async function showPosts() {
+    const b = F.$("#body");
+    if (!F.renderUserPosts || !F.auth.enabled) { b.innerHTML = ""; return; }
+    if (!member) { try { member = await F.profiles.byWallet(addr); } catch {} }
+    if (S.tab !== "posts") return;
+    if (!member) { b.innerHTML = `<div class="empty-state"><b>No posts yet</b>This wallet hasn't joined ${F.esc(F.cfg.siteName)} yet.</div>`; return; }
+    F.renderUserPosts(b, member.id);
+  }
   function renderIdentity() {
     if (!F.$("#pname")) return;
     const me = F.auth.isMe?.(addr), connectedHere = F.wallet.pubkey === addr;
