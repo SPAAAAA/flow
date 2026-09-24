@@ -379,3 +379,10 @@ body.has-mbar .chat-fab{bottom:84px}
   .coin-layout{grid-template-columns:1fr}
   .coin-side{position:static}
 }
+
+/* founder badge */
+.founder{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 8px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.08em;vertical-align:middle;color:#1a1300;
+  background:linear-gradient(135deg,#ffe58a,#ffb800 55%,#ffd24d);box-shadow:0 0 0 1px rgba(255,210,77,.6),0 0 18px -4px rgba(255,184,0,.7)}
+.founder svg{width:13px;height:13px}
+.founder.sm{font-size:9.5px;padding:1px 6px 1px 5px;gap:3px;letter-spacing:.06em;flex:none}
+.founder.sm svg{width:10px;height:10px}
