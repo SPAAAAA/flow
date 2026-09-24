@@ -121,6 +121,10 @@
   };
   F.logo = `<svg viewBox="0 0 32 32" fill="none"><path d="M4 12c4-5 8-5 12 0s8 5 12 0" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/><path d="M4 20c4-5 8-5 12 0s8 5 12 0" stroke="#fff" stroke-opacity=".6" stroke-width="3.2" stroke-linecap="round"/></svg>`;
 
+  /* ---------------- founder badge ---------------- */
+  F.isFounder = (w) => !!w && (CFG.founders || []).includes(w);
+  F.founderBadge = (w, small) => (F.isFounder(w) ? `<span class="founder${small ? " sm" : ""}" title="Founder of ${F.esc(CFG.siteName)}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z"/></svg>FOUNDER</span>` : "");
+
   /* ---------------- toasts ---------------- */
   F.toast = (title, msg = "", type = "") => {
     let box = F.$(".toasts");

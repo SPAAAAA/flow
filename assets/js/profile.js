@@ -131,7 +131,7 @@
   function renderIdentity() {
     if (!F.$("#pname")) return;
     const me = F.auth.isMe?.(addr), connectedHere = F.wallet.pubkey === addr;
-    F.$("#pname").innerHTML = `${member?.name ? F.esc(member.name) : F.short(addr, 6)} ${me || connectedHere ? '<span class="badge blue">You</span>' : ""}`;
+    F.$("#pname").innerHTML = `${member?.name ? F.esc(member.name) : F.short(addr, 6)} ${F.founderBadge(addr)} ${me || connectedHere ? '<span class="badge blue">You</span>' : ""}`;
     F.$("#pav").src = member?.avatar_url || F.avatar(addr);
     F.$("#psince").textContent = member ? `Member since ${new Date(member.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : "";
     F.$("#pdot").classList.toggle("hidden", !F.online.has(addr));

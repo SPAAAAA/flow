@@ -47,6 +47,9 @@ window.FLOW_CONFIG = {
   supabaseUrl: "https://jdsgoxjnavuyyvnrwosw.supabase.co",
   supabaseAnonKey: "sb_publishable_3sQSPPULWJjuxqFpcDXLpA_XT9bH63M",
 
+  // Wallets that get the FOUNDER badge (only editable here in the repo)
+  founders: ["5ZfqZdmid5jMVixfTZULPNvzRKtxxfCXYW6Xn8E6yDn7"],
+
   // Social links in the sidebar (leave "" to hide)
   socials: { x: "", telegram: "", discord: "" }
 };

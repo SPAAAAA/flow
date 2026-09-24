@@ -71,7 +71,7 @@
     try {
       const { error } = await F.sb.auth.signInWithWeb3({
         chain: "solana",
-        statement: `Sign in to ${CFG.siteName}. This only proves you own this wallet — it costs nothing and can't move funds.`,
+        statement: `Sign in to ${CFG.siteName}. This only proves you own this wallet. It is free and cannot move funds.`,
         wallet: F.wallet.provider,
       });
       if (error) throw error;
@@ -82,6 +82,7 @@
       F.toast("Signed in", A.profile ? `Welcome${A.profile.name ? ", " + F.esc(A.profile.name) : ""}!` : "");
       trackPresence();
     } catch (e) {
+      console.error("[FLOW] sign-in failed", e);
       const m = e.message || String(e);
       F.toast("Sign-in not completed", /reject|cancel|denied|declin/i.test(m) ? "You cancelled the signature." : F.esc(m), /reject|cancel/i.test(m) ? "warn" : "err");
     } finally { A.busy = false; emit(); }
@@ -230,7 +231,7 @@
     const t = new Date(m.created_at);
     return `<div class="msg ${mine ? "mine" : ""}" data-id="${m.id}">
       <a href="profile.html?a=${F.esc(p.wallet || "")}"><img src="${F.avatarOf(p)}" alt=""></a>
-      <div class="msg-body"><div class="msg-top"><a href="profile.html?a=${F.esc(p.wallet || "")}" class="msg-name">${F.displayName(p)}</a>${F.online.has(p.wallet) ? '<span class="online-dot" title="Online"></span>' : ""}
+      <div class="msg-body"><div class="msg-top"><a href="profile.html?a=${F.esc(p.wallet || "")}" class="msg-name">${F.displayName(p)}</a>${F.founderBadge(p.wallet, true)}${F.online.has(p.wallet) ? '<span class="online-dot" title="Online"></span>' : ""}
         <span class="msg-time" title="${t.toLocaleString()}">${t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>${canDel ? `<button class="msg-del" data-del="${m.id}" title="Delete">×</button>` : ""}</div>
         <div class="msg-text">${linkify(F.esc(m.body))}</div></div></div>`;
   }

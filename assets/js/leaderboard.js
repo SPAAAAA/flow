@@ -100,7 +100,7 @@
     F.$("#sub").textContent = `${online.length} member${online.length === 1 ? "" : "s"} online now`;
     const card = (m, on) => `<a class="member" href="profile.html?a=${F.esc(m.wallet)}">
       <div class="avatar-wrap"><img src="${F.esc(m.avatar || m.avatar_url || F.avatar(m.wallet))}" alt="">${on ? '<span class="online-dot" style="position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border:2px solid var(--panel);margin:0"></span>' : ""}</div>
-      <div style="min-width:0"><div class="n">${F.esc(m.name || F.short(m.wallet))}${F.auth.isMe(m.wallet) ? ' <span class="badge blue">You</span>' : ""}</div>
+      <div style="min-width:0"><div class="n">${F.esc(m.name || F.short(m.wallet))} ${F.founderBadge(m.wallet, true)}${F.auth.isMe(m.wallet) ? ' <span class="badge blue">You</span>' : ""}</div>
       <div class="s">${on ? "Online now" : "Last seen " + F.ago(Date.parse(m.last_seen)) + " ago"}</div></div></a>`;
     const signInCta = !F.auth.profile ? `<div class="empty-state" style="margin-bottom:16px;padding:22px"><b>Want to show up here?</b>Sign in with your wallet — it's free and only proves you own it.<div style="margin-top:12px"><button class="btn btn-primary" id="mem-signin">${F.wallet.connected ? "Sign in with wallet" : "Connect wallet"}</button></div></div>` : "";
     body.innerHTML = `${signInCta}
