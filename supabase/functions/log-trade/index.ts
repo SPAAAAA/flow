@@ -11,6 +11,11 @@ const cors = {
 };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const B58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
+function serviceKey(): string {
+  const k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (k) return k;
+  try { const j = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"); return j.default || (Object.values(j)[0] as string) || ""; } catch { return ""; }
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function getTx(sig: string) {
@@ -36,7 +41,7 @@ Deno.serve(async (req) => {
     if (typeof signature !== "string" || !B58.test(signature) || signature.length < 64 || signature.length > 90) return json({ error: "bad signature" }, 400);
     if (typeof mint !== "string" || !B58.test(mint) || mint.length < 32 || mint.length > 44) return json({ error: "bad mint" }, 400);
 
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey(), { auth: { persistSession: false } });
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const { data: u } = await admin.auth.getUser(jwt);
     if (!u?.user) return json({ error: "not signed in" }, 401);
@@ -62,7 +67,10 @@ Deno.serve(async (req) => {
     const side = dTok > 0 ? "buy" : "sell";
 
     // SOL moved by the swap = wallet balance change, excluding the network fee
-    let dSol = (tx.meta.postBalances[0] - tx.meta.preBalances[0] + tx.meta.fee) / 1e9;
+    // (+ any wrapped-SOL balance change, for swaps that keep SOL wrapped)
+    const WSOL = "So11111111111111111111111111111111111111112";
+    const ws = (arr: any[] | undefined) => sum((arr || []).filter((b) => b.mint === WSOL && b.owner === prof.wallet));
+    let dSol = (tx.meta.postBalances[0] - tx.meta.preBalances[0] + tx.meta.fee) / 1e9 + (ws(tx.meta.postTokenBalances) - ws(tx.meta.preTokenBalances));
     // a buy may create the token account (≈0.00204 SOL rent, refundable) — that isn't a cost of the coin
     if (side === "buy" && !preT.length && postT.length) dSol += 0.00203928;
     const sol = Math.max(0, side === "buy" ? -dSol : dSol);
