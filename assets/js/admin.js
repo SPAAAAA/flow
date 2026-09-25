@@ -22,12 +22,48 @@
   function shell() {
     root.innerHTML = `<div class="section-title"><h2>${F.icons.shield} Admin</h2><span class="muted" style="font-size:12px">Only you can see this page</span></div>
       <div class="kpis" id="adm-kpis">${Array(6).fill('<div class="skeleton" style="height:66px"></div>').join("")}</div>
+      <div class="panel" id="adm-awards"></div>
       <div class="panel">
         <div class="subtabs" id="adm-tabs"><button data-t="reports">Reports</button><button data-t="members">Members</button></div>
         <div id="adm-body"></div>
       </div>`;
     F.$("#adm-tabs").onclick = (e) => { const b = e.target.closest("[data-t]"); if (!b) return; S.tab = b.dataset.t; render(); };
-    loadOverview(); render();
+    loadOverview(); render(); loadAwards();
+  }
+
+  /* ---------------- weekly awards: best call needs price history, so the admin confirms it ---------------- */
+  async function loadAwards() {
+    const el = F.$("#adm-awards"); if (!el || !F.callResult) return;
+    const d = new Date(); const day = (d.getUTCDay() + 6) % 7;
+    const thisWk = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day), lastWk = thisWk - 7 * 864e5;
+    const wk = new Date(lastWk).toISOString().slice(0, 10);
+    await F.sb.rpc("award_last_week").catch(() => {});
+    const { data: won } = await F.sb.from("week_winners").select("*").eq("week", wk);
+    const has = (k) => (won || []).find((w) => w.category === k);
+    const label = new Date(lastWk).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    await loadProfiles((won || []).map((w) => w.user_id));
+    const line = (ic, k, t) => { const w = has(k); return `<div class="trade-row"><span>${ic} ${t}</span><b>${w ? `${who(prof(w.user_id))} <span class="muted">${F.esc(w.detail || "")}</span>` : '<span class="muted">—</span>'}</b></div>`; };
+    el.innerHTML = `<h3>👑 Last week's winners <span class="muted" style="font-weight:500;font-size:13px">(week of ${label})</span></h3>
+      ${line("💰", "trader", "Top trader")}${line("✍️", "poster", "Top poster")}${line("🎯", "call", "Best call")}
+      <div id="adm-call"></div>`;
+    if (has("call")) return;
+    const box = F.$("#adm-call"); box.innerHTML = `<p class="muted" style="font-size:13px">Working out last week's best call…</p>`;
+    const { data: calls } = await F.sb.rpc("week_calls", { wk });
+    let best = null;
+    for (const c of (calls || []).slice(0, 80)) {
+      const mint = c.coin_mint || (c.body.match(/\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/) || [])[1]; if (!mint) continue;
+      const r = await F.callResult(mint, Date.parse(c.created_at), thisWk).catch(() => null);
+      if (r && (!best || r.chg > best.r.chg)) best = { c, r };
+    }
+    if (!best || best.r.chg <= 0) { box.innerHTML = `<p class="muted" style="font-size:13px">No winning calls last week.</p>`; return; }
+    await loadProfiles([best.c.user_id]);
+    box.innerHTML = `<div class="adm-report"><div>🎯 Best call: ${who(prof(best.c.user_id))} — <b class="up">${F.fmtPct(best.r.chg)}</b> on $${F.esc(best.r.coin.symbol)} by the end of the week <a href="post.html?p=${best.c.id}" target="_blank" class="muted">view post</a></div>
+      <div class="adm-actions"><button class="btn btn-primary btn-sm" id="adm-crown">👑 Crown winner</button></div></div>`;
+    F.$("#adm-crown").onclick = async () => {
+      const { error } = await F.sb.rpc("admin_award_call", { wk, uid: best.c.user_id, gain: Number(best.r.chg.toFixed(2)), info: `${F.fmtPct(best.r.chg)} on $${best.r.coin.symbol}` });
+      if (error) return F.toast("Couldn't award", F.esc(error.message), "err");
+      F.toast("Winner crowned 👑"); loadAwards();
+    };
   }
   async function loadOverview() {
     const { data, error } = await F.sb.rpc("admin_overview");

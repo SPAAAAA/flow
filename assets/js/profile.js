@@ -36,9 +36,10 @@
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
       </div>
+      <div id="pinvite"></div>
       <div class="kpis" id="kpis">${Array(4).fill('<div class="skeleton" style="height:66px"></div>').join("")}</div>
       <div class="panel">
-        <div class="subtabs" id="tabs"><button data-t="coins" class="active">Coins held</button><button data-t="posts">Posts</button><button data-t="activity">Activity</button></div>
+        <div class="subtabs" id="tabs"><button data-t="coins" class="active">Coins held</button><button data-t="pnl">PnL</button><button data-t="posts">Posts</button><button data-t="activity">Activity</button></div>
         <div id="body"></div>
       </div>`;
     F.$("#cp").onclick = () => F.copy(addr, "Address copied");
@@ -48,6 +49,7 @@
       S.tab = b.dataset.t; F.$$("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
       if (S.tab === "coins") renderCoins();
       else if (S.tab === "posts") showPosts();
+      else if (S.tab === "pnl") renderPnl();
       else loadActivity();
     };
   }
@@ -103,6 +105,69 @@
       </tbody></table></div>` : `<div class="empty-state"><b>No coins yet</b>${S.hideDust && S.holdings.length ? "Only small balances — switch off “Hide small balances” to see them." : "This wallet doesn't hold any tokens."}</div>`}`;
     F.$("#dust").onchange = (e) => { S.hideDust = e.target.checked; F.store.set("hideDust", S.hideDust); renderCoins(); };
   }
+
+  /* ---------- PnL from verified FLOW trades ---------- */
+  let pnlRows = null;
+  async function renderPnl() {
+    const b = F.$("#body");
+    if (!F.pnl || !F.auth.enabled) { b.innerHTML = ""; return; }
+    if (!member) { try { member = await F.profiles.byWallet(addr); } catch {} }
+    if (!member) { b.innerHTML = `<div class="empty-state"><b>No FLOW trades</b>This wallet hasn't joined ${F.esc(F.cfg.siteName)} yet.</div>`; return; }
+    if (!pnlRows) {
+      b.innerHTML = `<div class="skeleton" style="height:200px"></div>`;
+      const hold = S.holdings ? new Map(S.holdings.map((h) => [h.mint, h.amount])) : null;
+      try { pnlRows = await F.pnl(member.id, hold); } catch (e) { b.innerHTML = `<div class="empty-state"><b>Couldn't load PnL</b>${F.esc(e.message)}</div>`; return; }
+    }
+    if (S.tab !== "pnl") return;
+    const rows = pnlRows, sol = await F.solUsd();
+    const me = F.auth.isMe(addr);
+    if (!rows.length) { b.innerHTML = `<div class="empty-state"><b>No trades yet</b>${me ? `Buy or sell any coin on ${F.esc(F.cfg.siteName)} and your profit and loss shows up here.` : `This member hasn't traded on ${F.esc(F.cfg.siteName)} yet.`}</div>`; return; }
+    const tot = rows.reduce((s, r) => s + r.total, 0), real = rows.reduce((s, r) => s + r.realized, 0), unr = rows.reduce((s, r) => s + r.unreal, 0);
+    const spent = rows.reduce((s, r) => s + r.bs, 0);
+    const closed = rows.filter((r) => r.st > 0), wins = closed.filter((r) => r.realized > 0).length;
+    const usd = (v) => (sol ? `<span class="muted" style="font-size:12px">${v < 0 ? "−" : ""}${F.usd(Math.abs(v * sol))}</span>` : "");
+    const cls = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
+    b.innerHTML = `<div class="kpis" style="margin-bottom:14px">
+        <div class="stat"><div class="l">Total PnL</div><div class="v ${cls(tot)}">${F.fmtSol(tot)} ${usd(tot)}</div></div>
+        <div class="stat"><div class="l">Realized</div><div class="v ${cls(real)}">${F.fmtSol(real)}</div></div>
+        <div class="stat"><div class="l">Unrealized</div><div class="v ${cls(unr)}">${F.fmtSol(unr)}</div></div>
+        <div class="stat"><div class="l">Win rate</div><div class="v">${closed.length ? Math.round((wins / closed.length) * 100) + "%" : "—"} <span class="muted" style="font-size:12px">${wins}/${closed.length} sold</span></div></div>
+      </div>
+      ${me ? `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-ghost btn-sm" id="pnl-share-all">${F.icons.share}Share my PnL</button></div>` : ""}
+      <div class="table-wrap" style="border:0;background:none"><table class="t" style="min-width:640px"><thead><tr><th>Coin</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Holding</th><th class="num">PnL</th><th></th></tr></thead><tbody>
+      ${rows.map((r, i) => { const c = r.coin; return `<tr data-href="coin.html?c=${r.mint}" style="cursor:pointer">
+        <td><div class="coin-cell"><img src="${F.img(c?.image, r.mint)}" alt=""><div><div class="n">${F.esc(c?.name || r.symbol || F.short(r.mint))}</div><div class="s">$${F.esc(c?.symbol || r.symbol || "")} · ${r.trades} trade${r.trades > 1 ? "s" : ""}</div></div></div></td>
+        <td class="num">${r.bs.toFixed(3)} SOL</td><td class="num">${r.ss.toFixed(3)} SOL</td>
+        <td class="num">${r.openVal != null && r.open > 0 ? r.openVal.toFixed(3) + " SOL" : "—"}</td>
+        <td class="num"><b class="${cls(r.total)}">${F.fmtSol(r.total)}</b><div class="${cls(r.total)}" style="font-size:12px">${F.fmtPct(r.pct)}</div></td>
+        <td class="num">${me ? `<button class="btn btn-ghost btn-sm" data-pshare="${i}" title="Share">${F.icons.share}</button>` : ""}</td></tr>`; }).join("")}
+      </tbody></table></div>
+      <p class="note">Only trades made on ${F.esc(F.cfg.siteName)} count, and each one is checked on the Solana blockchain. Unrealized PnL uses today's price.</p>`;
+    b.onclick = (e) => {
+      const s = e.target.closest("[data-pshare]");
+      if (s) { e.stopPropagation(); const r = rows[Number(s.dataset.pshare)]; const c = r.coin || {};
+        return F.openShare({ tag: "MY TRADE", big: F.fmtPct(r.pct), up: r.total >= 0, line1: `${F.fmtSol(r.total)} on $${c.symbol || r.symbol}`, line2: `Bought ${r.bs.toFixed(3)} SOL · ${r.ss ? `sold ${r.ss.toFixed(3)} SOL` : "still holding"}`,
+          coin: { image: c.image, symbol: c.symbol || r.symbol, name: c.name }, user: F.shareUser(), url: location.origin + location.pathname.replace(/[^/]*$/, "") + "coin.html?c=" + r.mint, text: `${F.fmtPct(r.pct)} on $${c.symbol || r.symbol} 🌊` }); }
+    };
+    const sa = F.$("#pnl-share-all");
+    if (sa) sa.onclick = () => { const best = rows.slice().sort((a, b2) => b2.total - a.total)[0]?.coin;
+      F.openShare({ tag: "MY PNL", big: F.fmtSol(tot, 2), up: tot >= 0, line1: `${F.fmtPct(spent ? (tot / spent) * 100 : null)} across ${rows.length} coin${rows.length > 1 ? "s" : ""}`, line2: `Win rate ${closed.length ? Math.round((wins / closed.length) * 100) + "%" : "—"} · verified on-chain`,
+        coin: { image: best?.image || member.avatar_url, symbol: "PNL", name: `${F.displayName(member).replace(/<[^>]+>/g, "")} on FLOW` }, user: F.shareUser(), url: location.href.split("#")[0], text: `My FLOW PnL: ${F.fmtSol(tot, 2)} 🌊` }); };
+  }
+
+  /* ---------- invite card (own profile) ---------- */
+  function renderInvite() {
+    const el = F.$("#pinvite"); if (!el) return;
+    if (!F.inviteLink || !F.auth.profile || !F.auth.isMe(addr)) { el.innerHTML = ""; return; }
+    const link = F.inviteLink(F.auth.profile);
+    const s = F.levels?.get(F.auth.profile.id);
+    el.innerHTML = `<div class="invite-card"><div class="invite-ic">${F.icons.gift}</div>
+      <div style="flex:1;min-width:0"><b>Invite friends to ${F.esc(F.cfg.siteName)}</b><div class="muted" style="font-size:13px">+25 XP for every friend who joins with your link${s ? ` · <b style="color:var(--text)">${s.invites || 0}</b> joined so far` : ""}. Invite 1 for 🎟️ Recruiter, 10 for 📣 Ambassador.</div>
+        <div class="invite-link"><input readonly value="${F.esc(link)}" id="invlink"><button class="btn btn-primary btn-sm" id="invcopy">${F.icons.copy}Copy</button></div></div></div>`;
+    F.$("#invcopy").onclick = () => F.copy(link, "Invite link copied");
+    F.$("#invlink").onclick = (e) => e.target.select();
+  }
+  document.addEventListener("flow:auth", () => setTimeout(renderInvite, 100));
 
   async function loadActivity() {
     const b = F.$("#body");
@@ -202,7 +267,7 @@
       if (member?.tiktok_handle) links.push(`<a href="https://www.tiktok.com/@${encodeURIComponent(member.tiktok_handle)}" target="_blank" rel="noopener nofollow" class="plink">${F.icons.tiktok}@${F.esc(member.tiktok_handle)}</a>`);
       bio.innerHTML = `${member?.bio ? `<p class="pbio-text">${F.esc(member.bio)}</p>` : ""}${links.length ? `<div class="plinks">${links.join("")}</div>` : ""}`;
     }
-    renderFollow(); renderLevel(); renderDmBtn();
+    renderFollow(); renderLevel().then(renderInvite); renderDmBtn();
     const ed = F.$("#pedit");
     if (!F.auth.enabled) ed.innerHTML = "";
     else if (me) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Edit profile</button>`; F.$("#edit-btn").onclick = openEdit; }

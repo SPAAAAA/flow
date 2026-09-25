@@ -105,11 +105,13 @@
       <div class="actions">
         <button class="btn btn-ghost btn-sm" data-star="${c.mint}" style="position:static">${F.watch.has(c.mint) ? F.icons.starFill : F.icons.star}</button>
         <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
+        ${F.alertModal ? `<button class="btn btn-ghost btn-sm" id="alertbtn">${F.icons.bell}Alert</button>` : ""}
         ${c.dsUrl ? `<a class="btn btn-ghost btn-sm" href="${F.esc(c.dsUrl)}" target="_blank" rel="noopener">DEX Screener ${F.icons.ext}</a>` : ""}
         <a class="btn btn-ghost btn-sm" href="https://solscan.io/token/${c.mint}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
       </div>`;
     F.$("#copyca").onclick = () => F.copy(c.mint, "Contract address copied");
     F.$("#share").onclick = () => F.copy(location.href, "Link copied");
+    const ab = F.$("#alertbtn"); if (ab) ab.onclick = () => F.alertModal(S.coin);
   }
   function renderStats() {
     const c = S.coin; if (!c) return;
@@ -478,8 +480,32 @@
     el.innerHTML = `<h3>Your position</h3>
       <div class="trade-row"><span>Holding</span><b>${F.num(S.bal.amount)} ${F.esc(c?.symbol || "")}</b></div>
       <div class="trade-row"><span>Value</span><b>${F.usd(val)}</b></div>
-      <div class="trade-row"><span>SOL balance</span><b>${S.sol != null ? S.sol.toFixed(4) : "—"} SOL</b></div>`;
+      <div class="trade-row"><span>SOL balance</span><b>${S.sol != null ? S.sol.toFixed(4) : "—"} SOL</b></div>
+      <div id="pospnl"></div>`;
+    renderPosPnl();
   }
+  /* PnL for this coin from verified FLOW trades */
+  let posPnl = null, posPnlAt = 0;
+  async function renderPosPnl(force) {
+    const box = F.$("#pospnl"); if (!box || !F.pnl || !F.auth?.profile) return;
+    if (force || !posPnl || Date.now() - posPnlAt > 60000) {
+      posPnlAt = Date.now();
+      try { const hold = new Map([[mint, S.bal?.amount || 0]]); posPnl = (await F.pnl(F.auth.profile.id, hold)).find((r) => r.mint === mint) || null; } catch { posPnl = null; }
+    }
+    const b = F.$("#pospnl"); if (!b) return;
+    if (!posPnl) { b.innerHTML = ""; return; }
+    const r = posPnl, up = r.total >= 0;
+    b.innerHTML = `<div class="trade-row"><span>Bought / sold on ${F.esc(CFG.siteName)}</span><b>${r.bs.toFixed(3)} / ${r.ss.toFixed(3)} SOL</b></div>
+      <div class="trade-row"><span>Profit / loss</span><b class="${up ? "up" : "down"}">${F.fmtSol(r.total)} <span style="font-weight:500">(${F.fmtPct(r.pct)})</span></b></div>
+      <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" id="pnlshare">${F.icons.share}Share my ${up ? "win" : "trade"}</button>`;
+    F.$("#pnlshare").onclick = () => F.openShare({
+      tag: "MY TRADE", big: F.fmtPct(r.pct), up,
+      line1: `${F.fmtSol(r.total)} on $${S.coin.symbol}`, line2: `Bought ${r.bs.toFixed(3)} SOL · ${r.ss ? `sold ${r.ss.toFixed(3)} SOL` : "still holding"}`,
+      coin: { image: S.coin.image, symbol: S.coin.symbol, name: S.coin.name }, user: F.shareUser(),
+      url: location.href.split("#")[0], text: `${F.fmtPct(r.pct)} on $${S.coin.symbol} 🌊`,
+    });
+  }
+  document.addEventListener("flow:trade", () => setTimeout(() => renderPosPnl(true), 500));
   document.addEventListener("flow:wallet", loadBalances);
 
   /* mobile buy/sell bar */

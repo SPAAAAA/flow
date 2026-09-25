@@ -48,7 +48,8 @@
       const up = chg >= 0;
       e.innerHTML = `<a class="call-pill ${up ? "up" : "down"}" href="coin.html?c=${F.esc(c.mint)}" title="Price when posted: ${F.price(then)} · now: ${F.price(c.priceUsd)}">
         ${up ? "📈" : "📉"} <b>${up ? "+" : ""}${Math.abs(chg) >= 1000 ? Math.round(chg).toLocaleString() : chg.toFixed(chg > -10 && chg < 10 ? 1 : 0)}%</b> since call
-        <span class="muted">· $${F.esc(c.symbol)}${mcThen ? ` ${F.usd(mcThen)} → ${F.usd(c.mcap)} MC` : ""}</span></a>`;
+        <span class="muted">· $${F.esc(c.symbol)}${mcThen ? ` ${F.usd(mcThen)} → ${F.usd(c.mcap)} MC` : ""}</span></a>${F.openShare && me() && me().id === e.dataset.uid ? `<button class="call-share" data-callshare title="Share this call">${F.icons.share}</button>` : ""}`;
+      e._call = { c, chg, mcThen };
     }
   }
   F.fillCalls = fillCalls;
@@ -147,7 +148,7 @@
         ${p.coin_mint && p.coin_mint !== ctxCoin ? `<a class="coin-chip" href="coin.html?c=${F.esc(p.coin_mint)}" data-coinchip="${F.esc(p.coin_mint)}"><img src="${F.avatar(p.coin_mint)}" alt="">on <b>${F.short(p.coin_mint)}</b></a>` : ""}
         <div class="post-text">${fmtText(p.body)}</div>
         <div class="poll" data-poll="${p.id}"></div>
-        ${callMint(p) ? `<div class="call" data-call="${F.esc(callMint(p))}" data-at="${Date.parse(p.created_at)}"></div>` : ""}
+        ${callMint(p) ? `<div class="call" data-call="${F.esc(callMint(p))}" data-at="${Date.parse(p.created_at)}" data-pid="${p.id}" data-uid="${F.esc(p.user_id)}"></div>` : ""}
         <div class="post-actions">
           <button class="pa pa-comment" data-comments="${p.id}" title="Comments">${bubble}<span>${p.comment_count || ""}</span></button>
           <button class="pa pa-like ${on ? "on" : ""}" data-like="${p.id}" title="${on ? "Unlike" : "Like"}">${heart(on)}<span>${p.like_count || ""}</span></button>
@@ -273,6 +274,11 @@
     if ((b = t.closest("[data-del-post]"))) return deletePost(Number(b.dataset.delPost), b);
     if ((b = t.closest("[data-del-cmt]"))) return deleteComment(Number(b.dataset.delCmt), Number(b.dataset.postOf), b);
     if ((b = t.closest("[data-signin]"))) return F.auth.signIn();
+    if ((b = t.closest("[data-callshare]"))) {
+      const box = b.closest("[data-call]"), x = box?._call; if (!x) return;
+      return F.openShare({ tag: "MY CALL", big: F.fmtPct(x.chg), up: x.chg >= 0, line1: `since I called $${x.c.symbol}`, line2: x.mcThen ? `Called at ${F.usd(x.mcThen)} MC → ${F.usd(x.c.mcap)} MC` : "",
+        coin: { image: x.c.image, symbol: x.c.symbol, name: x.c.name }, user: F.shareUser(), url: new URL("post.html?p=" + box.dataset.pid, location.href).href, text: `Called $${x.c.symbol} early: ${F.fmtPct(x.chg)} 🎯` });
+    }
   });
   document.addEventListener("submit", (e) => { const f = e.target.closest("[data-cform]"); if (f) { e.preventDefault(); addComment(f); } });
 

@@ -119,9 +119,10 @@
   function openPanel() {
     closePanel();
     N.open = true;
-    const p = F.h(`<div class="notif-panel" id="notif-panel"><div class="notif-head"><b>Notifications</b>${N.list.length ? '<button class="linkish" id="notif-clear">Clear all</button>' : ""}</div><div class="notif-list">${panelHtml()}</div></div>`);
+    const p = F.h(`<div class="notif-panel" id="notif-panel"><div class="notif-head"><b>Notifications</b><span style="display:flex;gap:12px">${F.alertsList ? '<button class="linkish" id="notif-alerts">🔔 Price alerts</button>' : ""}${N.list.length ? '<button class="linkish" id="notif-clear">Clear all</button>' : ""}</span></div><div class="notif-list">${panelHtml()}</div></div>`);
     F.$("#bell-slot").appendChild(p);
     p.addEventListener("click", (e) => e.stopPropagation());
+    const na = F.$("#notif-alerts", p); if (na) na.onclick = () => { closePanel(); F.alertsList(); };
     const clr = F.$("#notif-clear", p);
     if (clr) clr.onclick = async () => { await F.sb.from("notifications").delete().eq("user_id", me().id); N.list = []; N.unread = 0; renderBell(); openPanel(); };
     setTimeout(() => document.addEventListener("click", closePanel, { once: true }));
@@ -167,8 +168,11 @@
     { id: "social", ic: "🤝", name: "Social", why: "10+ followers", test: (s) => s.followers >= 10 },
     { id: "trader", ic: "💱", name: "Trader", why: "10+ trades on FLOW", test: (s) => s.trades >= 10 },
     { id: "streak", ic: "🔥", name: "On fire", why: "7-day visit streak", test: (s) => s.streak >= 7 },
+    { id: "champ", ic: "👑", name: "Weekly champ", why: "Won a weekly FLOW competition", test: (s) => s.wins >= 1 },
+    { id: "recruiter", ic: "🎟️", name: "Recruiter", why: "Invited a friend to FLOW", test: (s) => s.invites >= 1 },
+    { id: "ambassador", ic: "📣", name: "Ambassador", why: "Invited 10+ friends to FLOW", test: (s) => s.invites >= 10 },
   ];
-  const xpOf = (s) => s.posts * 10 + s.likes * 3 + s.comments * 4 + s.trades * 8 + s.followers * 6 + (s.checkins || 0) * 5;
+  const xpOf = (s) => s.posts * 10 + s.likes * 3 + s.comments * 4 + s.trades * 8 + s.followers * 6 + (s.checkins || 0) * 5 + (s.invites || 0) * 25 + (s.wins || 0) * 100;
   const levelOf = (xp) => Math.min(99, Math.floor(Math.sqrt(xp / 40)) + 1);
   const xpFor = (lvl) => 40 * (lvl - 1) ** 2;
   F.levels = {
@@ -204,7 +208,7 @@
     els.forEach((e) => {
       const s = F.levels.get(e.dataset.lvl); if (!s) return;
       const b = F.levels.badges(s.id);
-      const top = b.find((x) => x.id === "top") || b.find((x) => x.id === "early");
+      const top = b.find((x) => x.id === "champ") || b.find((x) => x.id === "top") || b.find((x) => x.id === "early");
       e.innerHTML = `${top ? `<span class="lvl-badge" title="${F.esc(top.name)}">${top.ic}</span>` : ""}<span class="lvl-pill lv${Math.min(5, Math.ceil(s.level / 5))}" title="Level ${s.level} · ${s.xp} XP">Lv ${s.level}</span>`;
       e.dataset.done = 1;
     });
