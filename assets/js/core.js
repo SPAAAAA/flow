@@ -270,10 +270,24 @@
 
   /* ================= Jupiter ================= */
   const jh = () => (CFG.jupiterApiKey ? { "x-api-key": CFG.jupiterApiKey } : {});
+  /* Platform fee is only charged once the fee token account exists on-chain
+     (otherwise Jupiter swaps would fail). Result is cached. */
+  let feeCheck = null;
+  F.feeReady = () => {
+    if (!(CFG.platformFeeBps > 0 && CFG.feeAccount)) return Promise.resolve(false);
+    if (F.store.get("feeOk_" + CFG.feeAccount, 0) > Date.now()) return Promise.resolve(true);
+    if (!feeCheck) feeCheck = F.rpc("getAccountInfo", [CFG.feeAccount, { encoding: "jsonParsed" }]).then((r) => {
+      const info = r?.value?.data?.parsed?.info;
+      const ok = !!info && info.mint === F.SOL;
+      if (ok) F.store.set("feeOk_" + CFG.feeAccount, Date.now() + 6 * 3600e3);
+      return ok;
+    }).catch(() => false);
+    return feeCheck;
+  };
   F.jup = {
     async quote(inputMint, outputMint, amountRaw, slippageBps) {
       const q = new URLSearchParams({ inputMint, outputMint, amount: String(amountRaw), slippageBps: String(slippageBps), maxAccounts: "64" });
-      if (CFG.platformFeeBps > 0 && CFG.feeAccount) q.set("platformFeeBps", String(CFG.platformFeeBps));
+      if ((inputMint === F.SOL || outputMint === F.SOL) && (await F.feeReady())) q.set("platformFeeBps", String(CFG.platformFeeBps));
       const r = await fetch(`${CFG.jupiterBase}/quote?${q}`, { headers: jh() });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || j.error) throw new Error(j.error || j.errorCode || `Quote failed (${r.status})`);
@@ -284,7 +298,7 @@
         quoteResponse, userPublicKey, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true,
         prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 1_500_000, priorityLevel: "high" } },
       };
-      if (CFG.platformFeeBps > 0 && CFG.feeAccount) body.feeAccount = CFG.feeAccount;
+      if (Number(quoteResponse.platformFee?.feeBps) > 0 && CFG.feeAccount) body.feeAccount = CFG.feeAccount;
       const r = await fetch(`${CFG.jupiterBase}/swap`, { method: "POST", headers: { "Content-Type": "application/json", ...jh() }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.swapTransaction) throw new Error(j.error || `Could not build swap (${r.status})`);

@@ -284,7 +284,8 @@
       <details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:13px">Slippage: <b id="slipLbl"></b></summary>
         <div class="slip" style="margin-top:8px" id="slip">${[100, 500, 1000, 2000].map((v) => `<button data-s="${v}">${v / 100}%</button>`).join("")}<input id="slipc" placeholder="Custom %" inputmode="decimal"></div>
         <p class="note">Meme coins move fast — higher slippage makes trades more likely to succeed but you may get a worse price.</p></details>
-      <p class="note">Swaps are routed by Jupiter and signed in your wallet. ${CFG.platformFeeBps > 0 && CFG.feeAccount ? `A ${CFG.platformFeeBps / 100}% ${F.esc(CFG.siteName)} fee applies.` : ""}</p>`;
+      <p class="note">Swaps are routed by Jupiter and signed in your wallet.<span id="feenote"></span></p>`;
+    F.feeReady().then((ok) => { const n = F.$("#feenote"); if (n && ok) n.textContent = ` A ${CFG.platformFeeBps / 100}% ${CFG.siteName} fee applies to each trade.`; });
     F.$(".bs").onclick = (e) => { const b = e.target.closest("[data-m]"); if (b) setMode(b.dataset.m); };
     F.$("#amt").addEventListener("input", (e) => { e.target.value = e.target.value.replace(",", ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"); S.maxRaw = null; queueQuote(); });
     F.$("#quick").onclick = (e) => {
@@ -375,6 +376,7 @@
       <div class="trade-row"><span>You receive ≈</span><b>${F.num(out, 4)} ${F.esc(sym)}</b></div>
       <div class="trade-row"><span>Minimum received</span><b>${F.num(min, 4)} ${F.esc(sym)}</b></div>
       <div class="trade-row"><span>Price impact</span><b class="${impact > 5 ? "down" : ""}">${impact < 0.01 ? "<0.01" : impact.toFixed(2)}%</b></div>
+      ${Number(q.platformFee?.feeBps) > 0 ? `<div class="trade-row"><span>${F.esc(CFG.siteName)} fee (${Number(q.platformFee.feeBps) / 100}%)</span><b>≈ ${F.num(((buy ? Number(q.inAmount) : Number(q.outAmount)) / 1e9) * Number(q.platformFee.feeBps) / 1e4, 5)} SOL</b></div>` : ""}
       ${route ? `<div class="trade-row"><span>Route</span><b style="max-width:200px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${F.esc(route)}</b></div>` : ""}
       ${impact > 10 ? `<p class="down" style="font-size:12px;margin:4px 0">⚠ High price impact — you'll lose a large part of this trade to slippage.</p>` : ""}`;
   }

@@ -2,7 +2,7 @@
 (function () {
   const F = FLOW, CFG = F.cfg, N = F.esc(CFG.siteName);
   F.layout("about");
-  const fee = CFG.platformFeeBps > 0 && CFG.feeAccount ? `${CFG.platformFeeBps / 100}%` : "0%";
+  const fee = CFG.platformFeeBps > 0 && CFG.feeAccount ? `${CFG.platformFeeBps / 100}% of each buy and sell, paid in SOL and shown in the trade panel before you confirm` : "0%";
   const faq = [
     ["What is " + N + "?", `${N} is a trading front-end for live Solana meme coins. It shows what's trending, new and about to graduate from the pump.fun bonding curve, and lets you buy and sell directly from your own wallet.`],
     ["Can I create a coin on " + N + "?", `No. ${N} is for discovering and trading existing coins only.`],

@@ -11,7 +11,7 @@ window.FLOW_CONFIG = {
   // browsers. Get a free key at https://www.helius.dev and paste the URL here:
   //   "https://mainnet.helius-rpc.com/?api-key=YOUR_KEY"
   // In the Helius dashboard, restrict the key to your site's domain.
-  rpcUrl: "https://api.mainnet-beta.solana.com",
+  rpcUrl: "https://solana-rpc.publicnode.com",
 
   // Jupiter swap API — routes every trade across all Solana DEXes
   // (including pump.fun bonding curves and PumpSwap).
@@ -22,8 +22,11 @@ window.FLOW_CONFIG = {
 
   // Optional FLOW fee on each trade, in basis points (100 = 1%). 0 = no fee.
   // Requires a Jupiter referral fee account — see README → "Earning fees".
-  platformFeeBps: 0,
-  feeAccount: "",
+  // Fee goes to the wrapped-SOL token account of wallet 5ZfqZdmid5jMVixfTZULPNvzRKtxxfCXYW6Xn8E6yDn7.
+  // Buys and sells both touch SOL, so every trade pays the fee in SOL.
+  // The site checks this account exists before charging, so trades never break.
+  platformFeeBps: 50,
+  feeAccount: "9ztS3yRwwsSJ6gcHRXYgTdALBGhX8e6ucs3EXCSFWMY7",
 
   // Default slippage in basis points (500 = 5%). Users can change it per trade.
   defaultSlippageBps: 500,
