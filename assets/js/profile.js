@@ -36,6 +36,7 @@
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
       </div>
+      <div id="pnlcard"></div>
       <div id="pinvite"></div>
       <div class="kpis" id="kpis">${Array(4).fill('<div class="skeleton" style="height:66px"></div>').join("")}</div>
       <div class="panel">
@@ -68,6 +69,7 @@
       S.err = null;
     } catch (e) { S.err = e.message; }
     renderKpis();
+    renderPnlCard();
     if (S.tab === "coins") renderCoins();
   }
 
@@ -154,6 +156,119 @@
       F.openShare({ tag: "MY PNL", big: F.fmtSol(tot, 2), up: tot >= 0, line1: `${F.fmtPct(spent ? (tot / spent) * 100 : null)} across ${rows.length} coin${rows.length > 1 ? "s" : ""}`, line2: `Win rate ${closed.length ? Math.round((wins / closed.length) * 100) + "%" : "—"} · verified on-chain`,
         coin: { image: best?.image || member.avatar_url, symbol: "PNL", name: `${F.displayName(member).replace(/<[^>]+>/g, "")} on FLOW` }, user: F.shareUser(), url: location.href.split("#")[0], text: `My FLOW PnL: ${F.fmtSol(tot, 2)} 🌊` }); };
   }
+
+  /* ---------- PnL card: portfolio value, profit over time, rank ---------- */
+  const PC = { range: F.store.get("pnlRange", "1M"), trades: null, forId: null, busy: false };
+  const RANGES = { "1D": 864e5, "1W": 7 * 864e5, "1M": 30 * 864e5, ALL: Infinity };
+  const money = (v, sign) => (v == null || isNaN(v) ? "—" : `${v < 0 ? "−" : sign && v > 0 ? "+" : ""}$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  async function renderPnlCard() {
+    const el = F.$("#pnlcard"); if (!el) return;
+    if (!F.auth.enabled || !F.pnl) { el.innerHTML = ""; return; }
+    if (!member) { try { member = await F.profiles.byWallet(addr); } catch {} }
+    if (!member) { el.innerHTML = ""; return; }
+    if (PC.busy) { PC.again = true; return; } PC.busy = true; PC.again = false;
+    try {
+      if (PC.forId !== member.id || !PC.trades) {
+        const { data } = await F.sb.from("trades").select("mint,side,sol_amount,tokens,created_at").eq("user_id", member.id).eq("verified", true).gt("tokens", 0).order("created_at", { ascending: true }).limit(3000);
+        PC.trades = data || []; PC.forId = member.id;
+      }
+      const sol = await F.solUsd();
+      const mints = [...new Set(PC.trades.map((t) => t.mint))];
+      const coins = await F.coinsByMint(mints);
+      const hold = S.holdings ? new Map(S.holdings.map((h) => [h.mint, h.amount])) : null;
+      // walk trades in order with average-cost accounting
+      const pos = new Map(), ev = []; let realized = 0;
+      for (const t of PC.trades) {
+        const p = pos.get(t.mint) || { tok: 0, cost: 0 }, s = +t.sol_amount || 0, k = +t.tokens || 0, at = Date.parse(t.created_at);
+        if (t.side === "buy") { p.tok += k; p.cost += s; ev.push({ t: at, r: realized, buy: s }); }
+        else { const avg = p.tok ? p.cost / p.tok : 0, m = Math.min(k, p.tok), got = k ? s * (m / k) : 0; realized += got - m * avg; p.tok -= m; p.cost -= m * avg; ev.push({ t: at, r: realized, buy: 0 }); }
+        pos.set(t.mint, p);
+      }
+      let unreal = 0;
+      for (const [m, p] of pos) {
+        let open = p.tok; if (hold) open = Math.min(open, hold.get(m) || 0);
+        const c = coins.get(m), px = c?.priceUsd && sol ? c.priceUsd / sol : null;
+        if (px != null && open > 0 && p.tok > 0) unreal += open * px - open * (p.cost / p.tok);
+      }
+      const now = Date.now(), span = RANGES[PC.range] || RANGES["1M"];
+      const start = span === Infinity ? (ev[0]?.t ?? now - 864e5) : now - span;
+      const before = ev.filter((e) => e.t < start), inside = ev.filter((e) => e.t >= start);
+      const base = before.length ? before[before.length - 1].r : 0;
+      const pReal = realized - base, profit = pReal + unreal;
+      const buyVol = inside.reduce((a, e) => a + e.buy, 0);
+      const pct = buyVol > 0 ? (profit / buyVol) * 100 : null;
+      const usd = (v) => (sol ? v * sol : null);
+      const portfolio = S.holdings ? S.holdings.reduce((a, h) => a + (h.value || 0), 0) + (S.sol != null && sol ? S.sol * sol : 0) : null;
+      // chart points (USD)
+      const pts = [{ t: start, v: 0 }, ...inside.map((e) => ({ t: e.t, v: e.r - base })), { t: now, v: pReal + unreal }].map((p) => ({ t: p.t, v: usd(p.v) ?? p.v }));
+      // rank among FLOW traders for the same period
+      let rank = null;
+      try { const { data: tt } = await F.sb.rpc("top_traders", { since: new Date(span === Infinity ? 0 : start).toISOString(), lim: 100 }); const i = (tt || []).findIndex((r) => r.user_id === member.id); if (i >= 0) rank = i + 1; } catch {}
+      const up = profit >= 0, cls = profit > 0 ? "up" : profit < 0 ? "down" : "";
+      el.innerHTML = `<div class="pnl-card ${up ? "is-up" : "is-down"}">
+        <div class="pc-top">
+          <div class="pc-main">
+            <div class="pc-big">${portfolio != null ? money(portfolio) : "…"}</div>
+            <div class="pc-lbl">Profit</div>
+            <div class="pc-profit ${cls}">${money(usd(profit), true)} <span>(${F.fmtPct(pct)})</span> <em>${PC.range === "ALL" ? "All time" : PC.range}</em></div>
+            ${rank ? `<div class="pc-rank ${cls}">Rank: #${rank}</div>` : `<div class="pc-rank muted">${PC.trades.length ? "Not ranked yet" : "No FLOW trades yet"}</div>`}
+          </div>
+          <div class="pc-side">
+            <div class="pc-ranges">${Object.keys(RANGES).map((r) => `<button data-pr="${r}" class="${PC.range === r ? "active" : ""}">${r}</button>`).join("")}</div>
+            <div class="pc-sol" title="SOL balance"><span class="pc-sol-ic">◎</span>${S.sol != null ? S.sol.toFixed(3) + " SOL" : "—"}<b>≈ ${S.sol != null && sol ? money(S.sol * sol) : "—"}</b></div>
+            ${F.auth.isMe(addr) && PC.trades.length ? `<button class="btn btn-ghost btn-sm" id="pc-share">${F.icons.share}Share</button>` : ""}
+          </div>
+        </div>
+        <div class="pc-chart" id="pc-chart"></div>
+        <div class="pc-stats">
+          <div><div class="pc-lbl">Realized</div><div class="pc-v ${pReal > 0 ? "up" : pReal < 0 ? "down" : ""}">${money(usd(pReal), true)}</div></div>
+          <div><div class="pc-lbl">Unrealized</div><div class="pc-v ${unreal > 0 ? "up" : unreal < 0 ? "down" : ""}">${money(usd(unreal), true)}</div></div>
+          <div><div class="pc-lbl">Buy volume</div><div class="pc-v">${money(usd(buyVol))}</div></div>
+        </div>
+        ${PC.trades.length ? "" : `<p class="note" style="margin:10px 0 0">Buy or sell any coin on ${F.esc(F.cfg.siteName)} to start the chart. Every trade is verified on-chain.</p>`}
+      </div>`;
+      drawChart(F.$("#pc-chart"), pts, up);
+      F.$$("[data-pr]", el).forEach((b) => (b.onclick = () => { PC.range = b.dataset.pr; F.store.set("pnlRange", PC.range); renderPnlCard(); }));
+      const sh = F.$("#pc-share");
+      if (sh) sh.onclick = () => F.openShare({ tag: `MY PNL · ${PC.range === "ALL" ? "ALL TIME" : PC.range}`, big: money(usd(profit), true).replace(/\.\d\d$/, ""), up, line1: `${F.fmtPct(pct)} profit${rank ? ` · Rank #${rank} on FLOW` : ""}`, line2: `Realized ${money(usd(pReal), true)} · Unrealized ${money(usd(unreal), true)}`,
+        coin: { image: member.avatar_url, symbol: "PNL", name: "Verified on-chain" }, user: F.shareUser(), url: location.href.split("#")[0], text: `My FLOW PnL: ${money(usd(profit), true)} 🌊` });
+    } finally { PC.busy = false; if (PC.again) { PC.again = false; setTimeout(renderPnlCard, 50); } }
+  }
+  function drawChart(box, pts, up) {
+    if (!box) return;
+    const W = 600, H = 170, P = 8;
+    const col = up ? "var(--up)" : "var(--down)";
+    const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1;
+    let lo = Math.min(0, ...pts.map((p) => p.v)), hi = Math.max(0, ...pts.map((p) => p.v));
+    if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+    const x = (t) => P + ((t - t0) / Math.max(1, t1 - t0)) * (W - 2 * P);
+    const y = (v) => P + (1 - (v - lo) / (hi - lo)) * (H - 2 * P);
+    // step line: value holds until the next trade
+    let d = `M${x(pts[0].t).toFixed(1)},${y(pts[0].v).toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) d += ` H${x(pts[i].t).toFixed(1)} V${y(pts[i].v).toFixed(1)}`;
+    const last = pts[pts.length - 1];
+    const area = `${d} V${y(lo).toFixed(1)} H${x(t0).toFixed(1)} Z`;
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="pc-svg">
+        <defs><pattern id="pcdots" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="rgba(255,255,255,.07)"/></pattern>
+          <linearGradient id="pcfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${up ? "#3d8bff" : "#ff4d6a"}" stop-opacity=".22"/><stop offset="1" stop-color="${up ? "#3d8bff" : "#ff4d6a"}" stop-opacity="0"/></linearGradient></defs>
+        <rect width="${W}" height="${H}" fill="url(#pcdots)"/>
+        <line x1="0" x2="${W}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="rgba(255,255,255,.12)" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/>
+        <path d="${area}" fill="url(#pcfill)"/>
+        <path d="${d}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        <line class="pc-x" x1="0" x2="0" y1="0" y2="${H}" stroke="rgba(255,255,255,.25)" vector-effect="non-scaling-stroke" style="display:none"/>
+      </svg><span class="pc-dot" style="left:${(x(last.t) / W) * 100}%;top:${(y(last.v) / H) * 100}%;background:${col}"></span><div class="pc-tip hidden"></div>`;
+    const svg = F.$("svg", box), tip = F.$(".pc-tip", box), xl = F.$(".pc-x", box);
+    box.onmousemove = (e) => {
+      const r = svg.getBoundingClientRect(), fx = ((e.clientX - r.left) / r.width) * W;
+      let best = pts[0]; for (const p of pts) if (x(p.t) <= fx) best = p;
+      xl.style.display = ""; xl.setAttribute("x1", x(best.t)); xl.setAttribute("x2", x(best.t));
+      tip.classList.remove("hidden");
+      tip.innerHTML = `<b class="${best.v >= 0 ? "up" : "down"}">${money(best.v, true)}</b><span>${new Date(best.t).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>`;
+      tip.style.left = Math.min(r.width - 150, Math.max(0, e.clientX - r.left - 70)) + "px";
+    };
+    box.onmouseleave = () => { tip.classList.add("hidden"); xl.style.display = "none"; };
+  }
+  document.addEventListener("flow:trade", () => { PC.trades = null; setTimeout(renderPnlCard, 800); });
 
   /* ---------- invite card (own profile) ---------- */
   function renderInvite() {
@@ -267,7 +382,7 @@
       if (member?.tiktok_handle) links.push(`<a href="https://www.tiktok.com/@${encodeURIComponent(member.tiktok_handle)}" target="_blank" rel="noopener nofollow" class="plink">${F.icons.tiktok}@${F.esc(member.tiktok_handle)}</a>`);
       bio.innerHTML = `${member?.bio ? `<p class="pbio-text">${F.esc(member.bio)}</p>` : ""}${links.length ? `<div class="plinks">${links.join("")}</div>` : ""}`;
     }
-    renderFollow(); renderLevel().then(renderInvite); renderDmBtn();
+    renderFollow(); renderLevel().then(renderInvite); renderDmBtn(); renderPnlCard();
     const ed = F.$("#pedit");
     if (!F.auth.enabled) ed.innerHTML = "";
     else if (me) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Edit profile</button>`; F.$("#edit-btn").onclick = openEdit; }
