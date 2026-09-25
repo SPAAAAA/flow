@@ -2,10 +2,18 @@
    Used by post.html (full feed) and profile.html (a member's posts). */
 (function () {
   const F = FLOW;
-  const SEL = "id,body,like_count,comment_count,created_at,user_id,profiles!posts_user_id_fkey(id,wallet,name,avatar_url)";
+  const SEL = "id,body,like_count,comment_count,created_at,user_id,coin_mint,profiles!posts_user_id_fkey(id,wallet,name,avatar_url)";
   const liked = new Set();       // post ids the signed-in member liked
   const byId = new Map();        // post id -> post
   const openComments = new Set();
+  let ctxCoin = null;            // coin page we're rendering a thread for (hide its own chip)
+  const coinMeta = new Map();
+  async function fillCoinChips(root = document) {
+    const chips = F.$$("[data-coinchip]", root); if (!chips.length) return;
+    const need = [...new Set(chips.map((c) => c.dataset.coinchip))].filter((m) => !coinMeta.has(m));
+    if (need.length) { try { F.toCoins(await F.dex.tokens(need)).forEach((c) => coinMeta.set(c.mint, c)); } catch {} need.forEach((m) => coinMeta.has(m) || coinMeta.set(m, null)); }
+    chips.forEach((el) => { const c = coinMeta.get(el.dataset.coinchip); if (!c) return; el.innerHTML = `<img src="${F.img(c.image, c.mint)}" alt="">on <b>$${F.esc(c.symbol)}</b>`; });
+  }
 
   const me = () => F.auth.profile;
   const canMod = (uid) => me() && (me().id === uid || me().is_admin);
@@ -37,6 +45,7 @@
           <a class="post-time" href="post.html?p=${p.id}" title="${new Date(p.created_at).toLocaleString()}">${when(p.created_at)}</a>
           ${canMod(p.user_id) ? `<button class="post-del" data-del-post="${p.id}" title="Delete post">${trash}</button>` : ""}
         </div>
+        ${p.coin_mint && p.coin_mint !== ctxCoin ? `<a class="coin-chip" href="coin.html?c=${F.esc(p.coin_mint)}" data-coinchip="${F.esc(p.coin_mint)}"><img src="${F.avatar(p.coin_mint)}" alt="">on <b>${F.short(p.coin_mint)}</b></a>` : ""}
         <div class="post-text">${fmtText(p.body)}</div>
         <div class="post-actions">
           <button class="pa pa-comment" data-comments="${p.id}" title="Comments">${bubble}<span>${p.comment_count || ""}</span></button>
@@ -185,10 +194,12 @@
   }
 
   /* ---------------- data loaders ---------------- */
-  async function fetchNew({ before, userId, limit = 20 } = {}) {
+  async function fetchNew({ before, userId, userIds, coinMint, limit = 20 } = {}) {
     let q = F.sb.from("posts").select(SEL).order("created_at", { ascending: false }).limit(limit);
     if (before) q = q.lt("created_at", before);
     if (userId) q = q.eq("user_id", userId);
+    if (userIds) q = q.in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+    if (coinMint) q = q.eq("coin_mint", coinMint);
     const { data, error } = await q;
     if (error) throw error;
     return data;
@@ -220,8 +231,77 @@
       const list = await fetchNew({ userId, limit: 50 });
       remember(list); await loadLiked(list.map((p) => p.id));
       box.innerHTML = list.length ? `<div class="feed">${list.map(postHtml).join("")}</div>` : `<div class="empty-state"><b>No posts yet</b>Posts from this member will show up here.</div>`;
-      startLive();
+      fillCoinChips(box); startLive();
     } catch (e) { box.innerHTML = `<div class="empty-state"><b>Couldn't load posts</b>${F.esc(e.message)}</div>`; }
+  };
+
+  /* ---------------- reusable composer ---------------- */
+  function mountComposer(c, { coinMint = null, placeholder = "What's happening in the trenches?", onPosted } = {}) {
+    if (!c) return;
+    if (!me()) {
+      c.innerHTML = `<div class="composer-cta"><div><b>${coinMint ? "Join the conversation" : `Share something with ${F.esc(F.cfg.siteName)}`}</b><div class="muted" style="font-size:13px">Sign in with your wallet to post, like and comment. It's free.</div></div>
+        <button class="btn btn-primary" data-signin ${F.auth.busy ? "disabled" : ""}>${F.auth.busy ? "Check your wallet…" : F.wallet.connected ? "Sign in with wallet" : "Connect wallet"}</button></div>`;
+      return;
+    }
+    if (F.$("textarea", c)) return; // keep what they're typing
+    c.innerHTML = `<img src="${F.avatarOf(me())}" alt="" class="composer-av">
+      <form class="composer-form">
+        <textarea maxlength="500" rows="2" placeholder="${F.esc(placeholder)}"></textarea>
+        <div class="composer-bar"><span class="muted" style="font-size:12px">${coinMint ? "Also shows on the Post page" : "Tip: paste a coin address or $TICKER"}</span><span class="spacer"></span>
+          <span class="count">500</span><button class="btn btn-primary btn-sm" disabled>Post</button></div>
+      </form>`;
+    const form = F.$("form", c), ta = F.$("textarea", c), cnt = F.$(".count", c), send = F.$("button", form);
+    const upd = () => { const n = 500 - ta.value.length; cnt.textContent = n; cnt.classList.toggle("warn", n < 40); send.disabled = !ta.value.trim(); ta.style.height = "auto"; ta.style.height = Math.min(260, ta.scrollHeight) + "px"; };
+    ta.addEventListener("input", upd);
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const body = ta.value.trim(); if (!body) return;
+      send.disabled = true; send.textContent = "Posting…";
+      const row = { user_id: me().id, body }; if (coinMint) row.coin_mint = coinMint;
+      const { data, error } = await F.sb.from("posts").insert(row).select(SEL).single();
+      send.textContent = "Post";
+      if (error) { upd(); return F.toast("Not posted", F.esc(/Slow down/.test(error.message) ? "Slow mode — you can post again in a few seconds." : error.message), "warn"); }
+      ta.value = ""; upd();
+      remember([data]);
+      onPosted && onPosted(data);
+      F.toast("Posted");
+    };
+  }
+
+  /* ---------------- coin thread (coin page Comments tab) ---------------- */
+  F.renderCoinThread = async (box, mint) => {
+    if (!F.auth.enabled) { box.innerHTML = `<p class="muted">Comments aren't set up yet.</p>`; return; }
+    ctxCoin = mint;
+    box.innerHTML = `<div class="composer thread-composer"></div><div class="thread-feed" style="margin-top:12px"><div class="skeleton" style="height:100px"></div></div>
+      <div class="load-more hidden"><button class="btn btn-ghost btn-sm">Load more</button></div>`;
+    const comp = F.$(".composer", box), feedEl = F.$(".thread-feed", box), more = F.$(".load-more", box);
+    let list = [];
+    const draw = () => {
+      feedEl.innerHTML = list.length ? `<div class="feed">${list.map(postHtml).join("")}</div>` : `<div class="empty-state" style="padding:28px"><b>No comments yet</b>Be the first to say something about this coin.</div>`;
+    };
+    const mountC = () => mountComposer(comp, { coinMint: mint, placeholder: "Say something about this coin…", onPosted: (p) => { list.unshift(p); draw(); } });
+    mountC();
+    try {
+      list = await fetchNew({ coinMint: mint, limit: 30 });
+      remember(list); await loadLiked(list.map((p) => p.id));
+      draw(); more.classList.toggle("hidden", list.length < 30);
+    } catch (e) { feedEl.innerHTML = `<p class="muted">Couldn't load comments: ${F.esc(e.message)}</p>`; }
+    F.$("button", more).onclick = async () => {
+      const older = await fetchNew({ coinMint: mint, before: list[list.length - 1]?.created_at, limit: 30 }).catch(() => []);
+      remember(older); await loadLiked(older.map((p) => p.id)); list.push(...older); draw(); more.classList.toggle("hidden", older.length < 30);
+    };
+    onNewPost = (p) => { if (p.coin_mint !== mint || byId.has(p.id) || !box.isConnected) return;
+      F.sb.from("posts").select(SEL).eq("id", p.id).single().then(({ data }) => { if (data && !byId.has(data.id)) { remember([data]); list.unshift(data); draw(); } }); };
+    startLive();
+    const reAuth = async () => { if (!box.isConnected) return; mountC(); liked.clear(); await loadLiked(list.map((p) => p.id)); draw(); };
+    document.addEventListener("flow:auth", reAuth);
+    document.addEventListener("flow:wallet", mountC);
+  };
+  F.coinThreadCount = async (mint) => {
+    if (!F.auth.enabled) return 0;
+    const { count } = await F.sb.from("posts").select("id", { count: "exact", head: true }).eq("coin_mint", mint);
+    return count || 0;
   };
 
   /* ================= Post page ================= */
@@ -229,7 +309,7 @@
   if (!root) return;
   F.layout("post");
   const single = Number(F.qs("p")) || null;
-  const S = { tab: F.qs("tab") === "new" ? "new" : F.store.get("postTab", "trending"), list: [], more: true, pending: [] };
+  const S = { tab: ["new", "following"].includes(F.qs("tab")) ? F.qs("tab") : F.store.get("postTab", "trending"), list: [], more: true, pending: [] };
 
   if (!F.auth.enabled) { root.innerHTML = `<div class="empty-state"><b>Posts aren't set up yet</b>Connect Supabase in config.js.</div>`; return; }
 
@@ -237,7 +317,7 @@
     ${single ? `<a href="post.html" class="back-link">← All posts</a><div id="feed"></div>` : `
     <div class="section-title"><h2>${F.icons.edit.replace("<svg", '<svg width="20" height="20"')} Posts</h2></div>
     <div class="composer" id="composer"></div>
-    <div class="toolbar" style="margin:16px 0 12px"><div class="tabs" id="ptabs"><button data-t="trending">🔥 Trending</button><button data-t="new">New</button></div>
+    <div class="toolbar" style="margin:16px 0 12px"><div class="tabs" id="ptabs"><button data-t="trending">🔥 Trending</button><button data-t="new">New</button><button data-t="following">Following</button></div>
       <span class="muted" id="ptabhint" style="font-size:12px"></span></div>
     <div class="new-posts hidden" id="newposts"></div>
     <div id="feed"><div class="skeleton" style="height:140px;margin-bottom:10px"></div><div class="skeleton" style="height:140px"></div></div>
@@ -245,50 +325,30 @@
   </div>`;
 
   function renderComposer() {
-    const c = F.$("#composer"); if (!c) return;
-    if (!me()) {
-      c.innerHTML = `<div class="composer-cta"><div><b>Share something with ${F.esc(F.cfg.siteName)}</b><div class="muted" style="font-size:13px">Sign in with your wallet to post, like and comment. It's free.</div></div>
-        <button class="btn btn-primary" data-signin ${F.auth.busy ? "disabled" : ""}>${F.auth.busy ? "Check your wallet…" : F.wallet.connected ? "Sign in with wallet" : "Connect wallet"}</button></div>`;
-      return;
-    }
-    if (F.$("#ptext")) return; // keep what they're typing
-    c.innerHTML = `<img src="${F.avatarOf(me())}" alt="" class="composer-av">
-      <form class="composer-form" id="pform">
-        <textarea id="ptext" maxlength="500" rows="2" placeholder="What's happening in the trenches?"></textarea>
-        <div class="composer-bar"><span class="muted" style="font-size:12px">Tip: paste a coin address or $TICKER</span><span class="spacer"></span>
-          <span class="count" id="pcount">500</span><button class="btn btn-primary btn-sm" id="psend" disabled>Post</button></div>
-      </form>`;
-    const ta = F.$("#ptext"), cnt = F.$("#pcount"), send = F.$("#psend");
-    const upd = () => { const n = 500 - ta.value.length; cnt.textContent = n; cnt.classList.toggle("warn", n < 40); send.disabled = !ta.value.trim(); ta.style.height = "auto"; ta.style.height = Math.min(260, ta.scrollHeight) + "px"; };
-    ta.addEventListener("input", upd);
-    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) F.$("#pform").requestSubmit(); });
-    F.$("#pform").onsubmit = async (e) => {
-      e.preventDefault();
-      const body = ta.value.trim(); if (!body) return;
-      send.disabled = true; send.textContent = "Posting…";
-      const { data, error } = await F.sb.from("posts").insert({ user_id: me().id, body }).select(SEL).single();
-      send.textContent = "Post";
-      if (error) { upd(); return F.toast("Not posted", F.esc(/Slow down/.test(error.message) ? "Slow mode — you can post again in a few seconds." : error.message), "warn"); }
-      ta.value = ""; upd();
-      remember([data]);
+    mountComposer(F.$("#composer"), { onPosted: async (data) => {
       if (S.tab !== "new") { S.tab = "new"; F.store.set("postTab", "new"); await loadFeed(); }
-      else if (!F.$(`#feed [data-post="${data.id}"]`)) F.$("#feed").insertAdjacentHTML("afterbegin", postHtml(data));
-      F.toast("Posted");
-    };
+      else if (!F.$(`#feed [data-post="${data.id}"]`)) { const f = F.$("#feed .feed"); if (f) f.insertAdjacentHTML("afterbegin", postHtml(data)); else loadFeed(); }
+    } });
   }
 
   async function loadFeed() {
     const feed = F.$("#feed");
     F.$$("#ptabs button").forEach((b) => b.classList.toggle("active", b.dataset.t === S.tab));
-    const hint = F.$("#ptabhint"); if (hint) hint.textContent = S.tab === "trending" ? "Most liked in the last 24 hours" : "Latest posts first";
+    const hint = F.$("#ptabhint"); if (hint) hint.textContent = S.tab === "trending" ? "Most liked in the last 24 hours" : S.tab === "following" ? "Latest posts from people you follow" : "Latest posts first";
     F.$("#newposts")?.classList.add("hidden"); S.pending = [];
     feed.innerHTML = `<div class="skeleton" style="height:140px;margin-bottom:10px"></div><div class="skeleton" style="height:140px"></div>`;
     try {
-      const list = S.tab === "trending" ? await fetchTrending() : await fetchNew();
-      S.list = list; S.more = S.tab === "new" && list.length === 20;
+      if (S.tab === "following") {
+        if (!me()) { feed.innerHTML = `<div class="empty-state"><b>See posts from people you follow</b>Sign in with your wallet, then follow members from their profile or from any post.<div style="margin-top:12px"><button class="btn btn-primary" data-signin>Sign in</button></div></div>`; F.$("#pmore").classList.add("hidden"); return; }
+        await F.follows.load();
+        if (!F.follows.ids().length) { feed.innerHTML = `<div class="empty-state"><b>You're not following anyone yet</b>Tap Follow on a member's profile to see their posts here.</div>`; F.$("#pmore").classList.add("hidden"); return; }
+      }
+      const list = S.tab === "trending" ? await fetchTrending() : S.tab === "following" ? await fetchNew({ userIds: F.follows.ids() }) : await fetchNew();
+      S.list = list; S.more = S.tab !== "trending" && list.length === 20;
       remember(list); await loadLiked(list.map((p) => p.id));
       feed.innerHTML = list.length ? `<div class="feed">${list.map(postHtml).join("")}</div>`
-        : `<div class="empty-state"><b>${S.tab === "trending" ? "Nothing trending yet" : "No posts yet"}</b>${S.tab === "trending" ? "Posts with the most likes in the last 24 hours show up here." : "Be the first to post!"}</div>`;
+        : `<div class="empty-state"><b>${S.tab === "trending" ? "Nothing trending yet" : S.tab === "following" ? "Nothing new yet" : "No posts yet"}</b>${S.tab === "trending" ? "Posts with the most likes in the last 24 hours show up here." : S.tab === "following" ? "People you follow haven't posted yet." : "Be the first to post!"}</div>`;
+      fillCoinChips(feed);
       F.$("#pmore").classList.toggle("hidden", !S.more);
     } catch (e) { feed.innerHTML = `<div class="empty-state"><b>Couldn't load posts</b>${F.esc(e.message)}</div>`; }
   }
@@ -296,10 +356,10 @@
     const last = S.list[S.list.length - 1]; if (!last) return;
     const btn = F.$("#pmore button"); btn.disabled = true;
     try {
-      const list = await fetchNew({ before: last.created_at });
+      const list = await fetchNew({ before: last.created_at, ...(S.tab === "following" ? { userIds: F.follows.ids() } : {}) });
       remember(list); await loadLiked(list.map((p) => p.id));
       S.list.push(...list); S.more = list.length === 20;
-      F.$("#feed .feed").insertAdjacentHTML("beforeend", list.map(postHtml).join(""));
+      F.$("#feed .feed").insertAdjacentHTML("beforeend", list.map(postHtml).join("")); fillCoinChips(F.$("#feed"));
     } catch {}
     btn.disabled = false; F.$("#pmore").classList.toggle("hidden", !S.more);
   }
@@ -310,7 +370,7 @@
     remember([data]); await loadLiked([data.id]);
     document.title = `${data.profiles?.name || "Post"}: "${data.body.slice(0, 40)}" — ${F.cfg.siteName}`;
     openComments.add(data.id);
-    feed.innerHTML = `<div class="feed single">${postHtml(data)}</div>`;
+    feed.innerHTML = `<div class="feed single">${postHtml(data)}</div>`; fillCoinChips(feed);
     toggleComments(data.id, true);
   }
 
@@ -333,6 +393,7 @@
     renderComposer();
     if (!booted) { booted = true; single ? loadSingle() : loadFeed(); startLive(); return; }
     // auth changed: refresh like state + delete buttons
+    if (S.tab === "following") return loadFeed();
     liked.clear(); await loadLiked([...byId.keys()]);
     F.$$("#feed [data-post]").forEach((el) => { const p = byId.get(Number(el.dataset.post)); if (p) el.outerHTML = postHtml(p); });
   };

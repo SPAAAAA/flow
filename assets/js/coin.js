@@ -15,7 +15,7 @@
     mode: "buy", tf: F.store.get("tf", "5m"),
     slip: F.store.get("slip", CFG.defaultSlippageBps),
     quote: null, quoting: false, quoteErr: null,
-    sol: null, bal: null, trades: [], tab: "trades",
+    sol: null, bal: null, trades: [], tab: F.auth?.enabled ? "comments" : "trades",
   };
 
   /* ---------------- skeleton ---------------- */
@@ -32,7 +32,7 @@
         <div class="chart-box" id="chart"><div class="chart-msg" id="chartmsg">Loading chart…</div></div>
       </div>
       <div class="panel">
-        <div class="subtabs" id="subtabs"><button data-t="trades" class="active">Trades</button><button data-t="holders">Top holders</button><button data-t="about">About</button></div>
+        <div class="subtabs" id="subtabs"><button data-t="comments" class="active">Comments <span class="tab-count" id="ccount"></span></button><button data-t="trades">Trades</button><button data-t="holders">Top holders</button><button data-t="about">About</button></div>
         <div id="tabbody"></div>
       </div>
     </div>
@@ -210,8 +210,13 @@
     const b = e.target.closest("[data-t]"); if (!b) return;
     S.tab = b.dataset.t;
     F.$$("#subtabs button").forEach((x) => x.classList.toggle("active", x === b));
-    if (S.tab === "trades") renderTrades(); else if (S.tab === "holders") loadHolders(); else renderAbout();
+    if (S.tab === "comments") renderComments(); else if (S.tab === "trades") renderTrades(); else if (S.tab === "holders") loadHolders(); else renderAbout();
   };
+  function renderComments() {
+    const b = F.$("#tabbody");
+    if (!F.renderCoinThread) { b.innerHTML = `<p class="muted">Comments aren't available.</p>`; return; }
+    F.renderCoinThread(b, mint);
+  }
   async function loadTrades() {
     if (!S.coin?.pair) { S.trades = []; if (S.tab === "trades") renderTrades(); return; }
     try { S.trades = await F.gecko.trades(S.coin.pair); } catch { S.tradesErr = true; }
@@ -401,6 +406,7 @@
       const t = F.toast("Transaction sent", `<a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">View on Solscan</a>`);
       const res = await F.wallet.confirm(sig);
       t.remove();
+      if (res.ok !== false && F.logTrade) F.logTrade({ mint, symbol: S.coin.symbol, side: buy ? "buy" : "sell", sol: buy ? Number(q.inAmount) / 1e9 : Number(q.outAmount) / 1e9, signature: sig });
       if (res.ok === true) F.toast(`${buy ? "Bought" : "Sold"} $${S.coin.symbol} ✓`, `<a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">View transaction</a>`);
       else if (res.ok === false) F.toast("Transaction failed", `Usually caused by price moving past your slippage. <a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">Details</a>`, "err");
       else F.toast("Transaction submitted", `Couldn't confirm yet — check <a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">Solscan</a>.`, "warn");
@@ -446,7 +452,9 @@
   (async () => {
     await loadCoin();
     loadChart(true); loadTrades(); loadInfo(); loadBalances(); renderPos();
-    renderTrades();
+    F.$$("#subtabs button").forEach((x) => x.classList.toggle("active", x.dataset.t === S.tab));
+    if (S.tab === "comments") renderComments(); else renderTrades();
+    if (F.coinThreadCount) F.coinThreadCount(mint).then((n) => { const e = F.$("#ccount"); if (e && n) e.textContent = n > 999 ? "999+" : n; });
   })();
   setInterval(() => { if (!document.hidden) { loadCoin(); } }, 12000);
   setInterval(() => { if (!document.hidden) { loadChart(false); if (S.tab === "trades") loadTrades(); } }, 20000);

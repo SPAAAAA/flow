@@ -25,6 +25,7 @@
         <div>
           <h1 id="pname">${F.short(addr, 6)}</h1>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="copy" id="cp">${F.short(addr, 10)} ${F.icons.copy}</button><span class="muted" style="font-size:12px" id="psince"></span></div>
+          <div class="follow-counts" id="pfollow"></div>
         </div>
         <div class="actions">
           <span id="pedit"></span>
@@ -130,6 +131,18 @@
     if (F.qs("edit") && !openedEdit) { openedEdit = true; if (F.auth.isMe?.(addr)) openEdit(); }
   }
   let openedEdit = false;
+  let counts = null, countsFor = null;
+  async function renderFollow() {
+    const el = F.$("#pfollow"); if (!el) return;
+    if (!F.auth.enabled || !member) { el.innerHTML = ""; return; }
+    if (countsFor !== member.id) { countsFor = member.id; counts = await F.follows.counts(member.id).catch(() => null); }
+    const me = F.auth.isMe?.(addr);
+    el.innerHTML = `${counts ? `<button class="linkish" data-fl="followers"><b>${counts.followers}</b> Followers</button><button class="linkish" data-fl="following"><b>${counts.following}</b> Following</button>` : ""}
+      ${!me ? F.followBtn(member.id) : ""}`;
+    el.onclick = (e) => { const b = e.target.closest("[data-fl]"); if (b) F.showFollowList(member.id, b.dataset.fl, b.dataset.fl === "followers" ? "Followers" : "Following"); };
+  }
+  document.addEventListener("flow:follow", (e) => { if (member && e.detail.id === member.id && counts) { counts.followers += e.detail.on ? 1 : -1; renderFollow(); } });
+  document.addEventListener("flow:follows-ready", () => renderFollow());
   async function showPosts() {
     const b = F.$("#body");
     if (!F.renderUserPosts || !F.auth.enabled) { b.innerHTML = ""; return; }
@@ -146,6 +159,7 @@
     F.$("#psince").textContent = member ? `Member since ${new Date(member.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : "";
     F.$("#pdot").classList.toggle("hidden", !F.online.has(addr));
     if (member?.name) document.title = `${member.name} — ${F.cfg.siteName}`;
+    renderFollow();
     const ed = F.$("#pedit");
     if (!F.auth.enabled) ed.innerHTML = "";
     else if (me) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Edit profile</button>`; F.$("#edit-btn").onclick = openEdit; }

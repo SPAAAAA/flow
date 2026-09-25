@@ -114,6 +114,7 @@
     tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 2h-3.4v13.4a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 1 0 5.4 6.3V8.6a7.9 7.9 0 0 0 4.4 1.4V6.6a4.5 4.5 0 0 1-4.4-4.6z"/></svg>',
     globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
     logout: I('<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>'),
+    bell: I('<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'),
     close: I('<path d="M6 6l12 12M18 6 6 18"/>'),
     chat: I('<path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"/>'),
     send: I('<path d="m4 12 16-8-6 16-2.5-6.5z"/>'),
@@ -532,7 +533,7 @@
         <header class="topbar">
           <button class="menu-btn" id="menu-btn" aria-label="Menu">${F.icons.menu}</button>
           <div class="search" id="search">${F.icons.search}<input id="search-input" placeholder="Search coins or paste a contract / wallet address" autocomplete="off"><kbd>/</kbd></div>
-          <div class="topbar-right" id="wallet-slot"></div>
+          <div class="topbar-right"><div id="bell-slot" class="bell-slot"></div><div id="wallet-slot"></div></div>
         </header>
         <main class="content" id="content"></main>
         <footer class="footer">${footSocials ? `<div class="foot-socials"><b>Follow ${F.esc(CFG.siteName)}</b>${footSocials}</div>` : ""}<span>Market data: DEX Screener & GeckoTerminal · Swaps routed by Jupiter</span><span>Meme coins are extremely risky. Only trade what you can afford to lose.</span></footer>
