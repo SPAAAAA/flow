@@ -52,6 +52,58 @@
     }
   }
   F.fillCalls = fillCalls;
+
+  /* ---------------- polls ---------------- */
+  const polls = new Map(), myVotes = new Map();
+  async function fillPolls(root = document) {
+    const els = F.$$("[data-poll]:not([data-done])", root); if (!els.length || !F.auth.enabled) return;
+    els.forEach((e) => (e.dataset.done = 1));
+    const ids = [...new Set(els.map((e) => Number(e.dataset.poll)))];
+    const need = ids.filter((i) => !polls.has(i));
+    if (need.length) {
+      const { data } = await F.sb.from("post_polls").select("post_id,options,ends_at").in("post_id", need);
+      need.forEach((i) => polls.set(i, null));
+      (data || []).forEach((r) => polls.set(r.post_id, { ...r, counts: [0, 0, 0, 0] }));
+    }
+    const withPoll = ids.filter((i) => polls.get(i));
+    if (!withPoll.length) return;
+    const { data: res } = await F.sb.rpc("poll_results", { ids: withPoll });
+    withPoll.forEach((i) => (polls.get(i).counts = [0, 0, 0, 0]));
+    (res || []).forEach((r) => { const pl = polls.get(r.post_id); if (pl) pl.counts[r.option] = Number(r.votes); });
+    if (me()) {
+      const { data: mine } = await F.sb.from("poll_votes").select("post_id,option").eq("user_id", me().id).in("post_id", withPoll);
+      (mine || []).forEach((v) => myVotes.set(v.post_id, v.option));
+    }
+    withPoll.forEach((i) => F.$$(`[data-poll="${i}"]`).forEach(drawPoll));
+  }
+  function drawPoll(el) {
+    const id = Number(el.dataset.poll), pl = polls.get(id); if (!pl) return;
+    const total = pl.counts.reduce((a, b) => a + b, 0);
+    const ended = Date.parse(pl.ends_at) <= Date.now();
+    const mine = myVotes.get(id);
+    const showRes = ended || mine != null;
+    const left = Date.parse(pl.ends_at) - Date.now();
+    const leftTxt = ended ? "Final results" : left > 864e5 ? `${Math.ceil(left / 864e5)} days left` : left > 36e5 ? `${Math.ceil(left / 36e5)} hours left` : `${Math.max(1, Math.ceil(left / 6e4))} min left`;
+    const top = Math.max(...pl.counts);
+    el.innerHTML = `<div class="poll-box">${pl.options.map((o, i) => {
+      const pct = total ? Math.round((pl.counts[i] / total) * 100) : 0;
+      return showRes
+        ? `<div class="poll-opt res ${mine === i ? "mine" : ""} ${ended && pl.counts[i] === top && top > 0 ? "win" : ""}"><i style="width:${pct}%"></i><span>${F.esc(o)}${mine === i ? " ✓" : ""}</span><b>${pct}%</b></div>`
+        : `<button class="poll-opt" data-vote="${id}:${i}"><span>${F.esc(o)}</span></button>`;
+    }).join("")}<div class="poll-meta">${total} vote${total === 1 ? "" : "s"} · ${leftTxt}</div></div>`;
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-vote]"); if (!b) return;
+    if (!(await needSignIn())) return;
+    const [id, opt] = b.dataset.vote.split(":").map(Number);
+    const pl = polls.get(id); if (!pl) return;
+    myVotes.set(id, opt); pl.counts[opt]++;
+    F.$$(`[data-poll="${id}"]`).forEach(drawPoll);
+    const { error } = await F.sb.from("poll_votes").insert({ post_id: id, user_id: me().id, option: opt });
+    if (error && error.code !== "23505") { myVotes.delete(id); pl.counts[opt]--; F.$$(`[data-poll="${id}"]`).forEach(drawPoll); F.toast("Vote not counted", F.esc(error.message), "warn"); }
+  });
+  let pollTimer;
+  new MutationObserver(() => { clearTimeout(pollTimer); pollTimer = setTimeout(() => fillPolls(), 250); }).observe(document.body, { childList: true, subtree: true });
   let callTimer;
   new MutationObserver(() => { clearTimeout(callTimer); callTimer = setTimeout(() => fillCalls(), 300); }).observe(document.body, { childList: true, subtree: true });
   async function fillCoinChips(root = document) {
@@ -71,7 +123,8 @@
   function fmtText(s) {
     return F.esc(s)
       .replace(/\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/g, (a) => `<a href="coin.html?c=${a}" class="msg-ca">${F.short(a)}</a>`)
-      .replace(/\$([A-Za-z][A-Za-z0-9]{1,11})\b/g, '<b class="msg-tk">$$$1</b>')
+      .replace(/\$([A-Za-z][A-Za-z0-9]{1,11})\b/g, (m, t) => `<a class="msg-tk" href="post.html?tag=${t.toUpperCase()}">$${t}</a>`)
+      .replace(/(^|[\s(])@([A-Za-z0-9_.\-]{2,20})/g, (m, sp, h) => `${sp}<a class="mention" href="profile.html?u=${encodeURIComponent(h)}">@${h}</a>`)
       .replace(/(^|\s)(https?:\/\/[^\s<]+)/g, (m, sp, u) => `${sp}<a href="${u}" target="_blank" rel="noopener nofollow ugc" class="post-link">${u.replace(/^https?:\/\//, "").slice(0, 40)}</a>`);
   }
   function when(t) {
@@ -93,6 +146,7 @@
         </div>
         ${p.coin_mint && p.coin_mint !== ctxCoin ? `<a class="coin-chip" href="coin.html?c=${F.esc(p.coin_mint)}" data-coinchip="${F.esc(p.coin_mint)}"><img src="${F.avatar(p.coin_mint)}" alt="">on <b>${F.short(p.coin_mint)}</b></a>` : ""}
         <div class="post-text">${fmtText(p.body)}</div>
+        <div class="poll" data-poll="${p.id}"></div>
         ${callMint(p) ? `<div class="call" data-call="${F.esc(callMint(p))}" data-at="${Date.parse(p.created_at)}"></div>` : ""}
         <div class="post-actions">
           <button class="pa pa-comment" data-comments="${p.id}" title="Comments">${bubble}<span>${p.comment_count || ""}</span></button>
@@ -241,12 +295,13 @@
   }
 
   /* ---------------- data loaders ---------------- */
-  async function fetchNew({ before, userId, userIds, coinMint, limit = 20 } = {}) {
+  async function fetchNew({ before, userId, userIds, coinMint, tag, limit = 20 } = {}) {
     let q = F.sb.from("posts").select(SEL).order("created_at", { ascending: false }).limit(limit);
     if (before) q = q.lt("created_at", before);
     if (userId) q = q.eq("user_id", userId);
     if (userIds) q = q.in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
     if (coinMint) q = q.eq("coin_mint", coinMint);
+    if (tag) q = q.ilike("body", `%$${tag.replace(/[%_]/g, "")}%`);
     const { data, error } = await q;
     if (error) throw error;
     return data;
@@ -283,7 +338,7 @@
   };
 
   /* ---------------- reusable composer ---------------- */
-  function mountComposer(c, { coinMint = null, placeholder = "What's happening in the trenches?", onPosted } = {}) {
+  function mountComposer(c, { coinMint = null, placeholder = "What's happening in the trenches?", onPosted, prefill = "" } = {}) {
     if (!c) return;
     if (!me()) {
       c.innerHTML = `<div class="composer-cta"><div><b>${coinMint ? "Join the conversation" : `Share something with ${F.esc(F.cfg.siteName)}`}</b><div class="muted" style="font-size:13px">Sign in with your wallet to post, like and comment. It's free.</div></div>
@@ -293,11 +348,20 @@
     if (F.$("textarea", c)) return; // keep what they're typing
     c.innerHTML = `<img src="${F.avatarOf(me())}" alt="" class="composer-av">
       <form class="composer-form">
-        <textarea maxlength="500" rows="2" placeholder="${F.esc(placeholder)}"></textarea>
-        <div class="composer-bar"><span class="muted" style="font-size:12px">${coinMint ? "Also shows on the Post page" : "Tip: paste a coin address or $TICKER"}</span><span class="spacer"></span>
+        <textarea maxlength="500" rows="2" placeholder="${F.esc(placeholder)}">${F.esc(prefill || "")}</textarea>
+        <div class="poll-builder hidden">
+          ${[0, 1, 2, 3].map((i) => `<input class="input pb-opt" maxlength="40" placeholder="Option ${i + 1}${i > 1 ? " (optional)" : ""}">`).join("")}
+          <div class="pb-row"><span class="muted" style="font-size:12px">Poll length</span>
+            <select class="select pb-len"><option value="1">1 hour</option><option value="6">6 hours</option><option value="24" selected>1 day</option><option value="72">3 days</option><option value="168">7 days</option></select>
+            <button type="button" class="linkish pb-remove">Remove poll</button></div>
+        </div>
+        <div class="composer-bar"><button type="button" class="pb-toggle" title="Add a poll">📊 Poll</button><span class="muted" style="font-size:12px">${coinMint ? "Also shows on the Post page" : "Tip: $TICKER, @name or a coin address"}</span><span class="spacer"></span>
           <span class="count">500</span><button class="btn btn-primary btn-sm" disabled>Post</button></div>
       </form>`;
-    const form = F.$("form", c), ta = F.$("textarea", c), cnt = F.$(".count", c), send = F.$("button", form);
+    const form = F.$("form", c), ta = F.$("textarea", c), cnt = F.$(".count", c), send = F.$(".composer-bar .btn-primary", form);
+    const pb = F.$(".poll-builder", c);
+    F.$(".pb-toggle", c).onclick = () => { pb.classList.toggle("hidden"); if (!pb.classList.contains("hidden")) F.$(".pb-opt", pb).focus(); };
+    F.$(".pb-remove", c).onclick = () => { pb.classList.add("hidden"); F.$$(".pb-opt", pb).forEach((i) => (i.value = "")); };
     const upd = () => { const n = 500 - ta.value.length; cnt.textContent = n; cnt.classList.toggle("warn", n < 40); send.disabled = !ta.value.trim(); ta.style.height = "auto"; ta.style.height = Math.min(260, ta.scrollHeight) + "px"; };
     ta.addEventListener("input", upd);
     ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
@@ -305,11 +369,21 @@
       e.preventDefault();
       const body = ta.value.trim(); if (!body) return;
       send.disabled = true; send.textContent = "Posting…";
+      const pollOn = !pb.classList.contains("hidden");
+      const opts = F.$$(".pb-opt", pb).map((i) => i.value.trim()).filter(Boolean);
+      if (pollOn && opts.length < 2) { send.textContent = "Post"; upd(); return F.toast("Add at least 2 poll options", "", "warn"); }
       const row = { user_id: me().id, body }; if (coinMint) row.coin_mint = coinMint;
       const { data, error } = await F.sb.from("posts").insert(row).select(SEL).single();
       send.textContent = "Post";
       if (error) { upd(); return F.toast("Not posted", F.esc(/Slow down/.test(error.message) ? "Slow mode — you can post again in a few seconds." : error.message), "warn"); }
-      ta.value = ""; upd();
+      if (pollOn) {
+        const hours = Number(F.$(".pb-len", pb).value);
+        const { error: pe } = await F.sb.from("post_polls").insert({ post_id: data.id, options: opts.slice(0, 4), ends_at: new Date(Date.now() + hours * 36e5).toISOString() });
+        if (pe) F.toast("Posted, but the poll failed", F.esc(pe.message), "warn");
+        polls.delete(data.id);
+        pb.classList.add("hidden"); F.$$(".pb-opt", pb).forEach((i) => (i.value = ""));
+      }
+      ta.value = prefill || ""; upd();
       remember([data]);
       onPosted && onPosted(data);
       F.toast("Posted");
@@ -356,13 +430,15 @@
   if (!root) return;
   F.layout("post");
   const single = Number(F.qs("p")) || null;
+  const tag = (F.qs("tag") || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 12) || null;
   const S = { tab: ["new", "following"].includes(F.qs("tab")) ? F.qs("tab") : F.store.get("postTab", "trending"), list: [], more: true, pending: [] };
 
   if (!F.auth.enabled) { root.innerHTML = `<div class="empty-state"><b>Posts aren't set up yet</b>Connect Supabase in config.js.</div>`; return; }
 
   root.innerHTML = `<div class="feed-wrap">
     ${single ? `<a href="post.html" class="back-link">← All posts</a><div id="feed"></div>` : `
-    <div class="section-title"><h2>${F.icons.edit.replace("<svg", '<svg width="20" height="20"')} Posts</h2></div>
+    ${tag ? `<a href="post.html" class="back-link">← All posts</a><div class="section-title"><h2><span class="msg-tk">$${F.esc(tag)}</span> posts</h2><span class="muted" id="tagcoin"></span></div>`
+          : `<div class="section-title"><h2>${F.icons.edit.replace("<svg", '<svg width="20" height="20"')} Posts</h2></div>`}
     <div class="composer" id="composer"></div>
     <div class="toolbar" style="margin:16px 0 12px"><div class="tabs" id="ptabs"><button data-t="trending">🔥 Trending</button><button data-t="new">New</button><button data-t="following">Following</button></div>
       <span class="muted" id="ptabhint" style="font-size:12px"></span></div>
@@ -371,8 +447,9 @@
     <div class="load-more hidden" id="pmore"><button class="btn btn-ghost">Load more</button></div>`}
   </div>`;
 
+  if (tag) { S.tab = "new"; setTimeout(() => { const t = F.$("#ptabs"); if (t) t.parentElement.classList.add("hidden"); }, 0); }
   function renderComposer() {
-    mountComposer(F.$("#composer"), { onPosted: async (data) => {
+    mountComposer(F.$("#composer"), { prefill: tag ? `$${tag} ` : "", placeholder: tag ? `Say something about $${tag}…` : undefined, onPosted: async (data) => {
       if (S.tab !== "new") { S.tab = "new"; F.store.set("postTab", "new"); await loadFeed(); }
       else if (!F.$(`#feed [data-post="${data.id}"]`)) { const f = F.$("#feed .feed"); if (f) f.insertAdjacentHTML("afterbegin", postHtml(data)); else loadFeed(); }
     } });
@@ -390,8 +467,8 @@
         await F.follows.load();
         if (!F.follows.ids().length) { feed.innerHTML = `<div class="empty-state"><b>You're not following anyone yet</b>Tap Follow on a member's profile to see their posts here.</div>`; F.$("#pmore").classList.add("hidden"); return; }
       }
-      const list = S.tab === "trending" ? await fetchTrending() : S.tab === "following" ? await fetchNew({ userIds: F.follows.ids() }) : await fetchNew();
-      S.list = list; S.more = S.tab !== "trending" && list.length === 20;
+      const list = tag ? await fetchNew({ tag }) : S.tab === "trending" ? await fetchTrending() : S.tab === "following" ? await fetchNew({ userIds: F.follows.ids() }) : await fetchNew();
+      S.list = list; S.more = (tag || S.tab !== "trending") && list.length === 20;
       remember(list); await loadLiked(list.map((p) => p.id));
       feed.innerHTML = list.length ? `<div class="feed">${list.map(postHtml).join("")}</div>`
         : `<div class="empty-state"><b>${S.tab === "trending" ? "Nothing trending yet" : S.tab === "following" ? "Nothing new yet" : "No posts yet"}</b>${S.tab === "trending" ? "Posts with the most likes in the last 24 hours show up here." : S.tab === "following" ? "People you follow haven't posted yet." : "Be the first to post!"}</div>`;
@@ -403,7 +480,7 @@
     const last = S.list[S.list.length - 1]; if (!last) return;
     const btn = F.$("#pmore button"); btn.disabled = true;
     try {
-      const list = await fetchNew({ before: last.created_at, ...(S.tab === "following" ? { userIds: F.follows.ids() } : {}) });
+      const list = await fetchNew({ before: last.created_at, ...(tag ? { tag } : S.tab === "following" ? { userIds: F.follows.ids() } : {}) });
       remember(list); await loadLiked(list.map((p) => p.id));
       S.list.push(...list); S.more = list.length === 20;
       F.$("#feed .feed").insertAdjacentHTML("beforeend", list.map(postHtml).join("")); fillCoinChips(F.$("#feed"));

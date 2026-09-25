@@ -20,16 +20,18 @@
   function shell() {
     document.title = `${F.short(addr)} — ${F.cfg.siteName}`;
     root.innerHTML = `
+      <div class="pbanner" id="pbanner"></div>
       <div class="profile-head">
         <div class="avatar-wrap"><img class="avatar" id="pav" src="${F.avatar(addr)}" alt=""><span class="online-dot hidden" id="pdot" title="Online now"></span></div>
         <div>
           <h1 id="pname">${F.short(addr, 6)}</h1>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="copy" id="cp">${F.short(addr, 10)} ${F.icons.copy}</button><span class="muted" style="font-size:12px" id="psince"></span></div>
+          <div class="pbio" id="pbio"></div>
           <div class="follow-counts" id="pfollow"></div>
           <div class="plevel" id="plevel"></div>
         </div>
         <div class="actions">
-          <span id="pedit"></span>
+          <span id="pedit"></span><span id="pdm"></span>
           <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
@@ -117,7 +119,16 @@
     }
   }
 
-  function start() {
+  async function start() {
+    const u = F.qs("u");
+    if (!addr && u && F.auth.enabled) {
+      const want = u.toLowerCase().replace(/^@/, "");
+      const { data } = await F.sb.from("profiles").select("wallet,name").ilike("name", want.replace(/_/g, "_").replace(/[%]/g, "")).limit(20);
+      const hit = (data || []).find((p) => p.name && p.name.replace(/ /g, "_").toLowerCase() === want)
+        || (await F.sb.from("profiles").select("wallet,name").ilike("name", want.replace(/_/g, " ")).limit(5)).data?.find((p) => p.name.replace(/ /g, "_").toLowerCase() === want);
+      if (hit) addr = hit.wallet;
+      else { root.innerHTML = `<div class="empty-state"><b>No member called @${F.esc(u)}</b>Check the spelling, or search by wallet address.</div>`; return; }
+    }
     if (!addr) { if (F.wallet.pubkey) addr = F.wallet.pubkey; else return prompt(); }
     if (!F.isAddress(addr)) { root.innerHTML = `<div class="empty-state"><b>Invalid address</b>That doesn't look like a Solana wallet address.</div>`; return; }
     shell(); renderCoins(); load(); loadMember();
@@ -139,9 +150,18 @@
     const i = F.levels.info(member.id); if (!i) { el.innerHTML = ""; return; }
     const b = F.levels.badges(member.id);
     el.innerHTML = `<div class="plevel-row"><span class="lvl-pill lv${Math.min(5, Math.ceil(i.level / 5))}">Lv ${i.level}</span>
-        <div class="xpbar" title="${i.xp} / ${i.next} XP"><i style="width:${i.pct}%"></i></div><span class="muted" style="font-size:12px">${i.xp} / ${i.next} XP</span></div>
+        <div class="xpbar" title="${i.xp} / ${i.next} XP"><i style="width:${i.pct}%"></i></div><span class="muted" style="font-size:12px">${i.xp} / ${i.next} XP</span>${i.streak ? `<span class="streak-pill" title="Visited ${i.streak} days in a row">🔥 ${i.streak}-day streak</span>` : ""}</div>
       ${b.length ? `<div class="badge-row">${b.map((x) => `<span class="mbadge" title="${F.esc(x.why)}">${x.ic} ${F.esc(x.name)}</span>`).join("")}</div>` : ""}`;
   }
+  async function renderDmBtn() {
+    const slot = F.$("#pdm"); if (!slot) return;
+    slot.innerHTML = "";
+    if (!F.auth.enabled || !member || !F.auth.profile || F.auth.isMe(addr)) return;
+    const { data } = await F.sb.rpc("can_dm", { a: F.auth.profile.id, b: member.id }).catch(() => ({ data: false }));
+    if (data) slot.innerHTML = `<a class="btn btn-ghost btn-sm" href="messages.html?to=${F.esc(member.id)}">${F.icons.chat}Message</a>`;
+    else slot.innerHTML = `<button class="btn btn-ghost btn-sm" disabled title="You can message each other once you both follow each other">${F.icons.chat}Message</button>`;
+  }
+  document.addEventListener("flow:follow", () => setTimeout(renderDmBtn, 300));
   let counts = null, countsFor = null;
   async function renderFollow() {
     const el = F.$("#pfollow"); if (!el) return;
@@ -154,6 +174,7 @@
   }
   document.addEventListener("flow:follow", (e) => { if (member && e.detail.id === member.id && counts) { counts.followers += e.detail.on ? 1 : -1; renderFollow(); } });
   document.addEventListener("flow:follows-ready", () => renderFollow());
+  document.addEventListener("flow:streak", () => { if (member && F.auth.isMe(addr)) renderLevel(); });
   async function showPosts() {
     const b = F.$("#body");
     if (!F.renderUserPosts || !F.auth.enabled) { b.innerHTML = ""; return; }
@@ -170,7 +191,17 @@
     F.$("#psince").textContent = member ? `Member since ${new Date(member.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : "";
     F.$("#pdot").classList.toggle("hidden", !F.online.has(addr));
     if (member?.name) document.title = `${member.name} — ${F.cfg.siteName}`;
-    renderFollow(); renderLevel();
+    const bn = F.$("#pbanner");
+    if (bn) { bn.style.backgroundImage = member?.banner_url ? `url("${member.banner_url.replace(/"/g, "")}")` : ""; bn.classList.toggle("has", !!member?.banner_url); }
+    const bio = F.$("#pbio");
+    if (bio) {
+      const links = [];
+      if (member?.name) links.push(`<span class="muted mono">@${F.esc(F.handleOf(member))}</span>`);
+      if (member?.x_handle) links.push(`<a href="https://x.com/${encodeURIComponent(member.x_handle)}" target="_blank" rel="noopener nofollow" class="plink">${F.icons.x}@${F.esc(member.x_handle)}</a>`);
+      if (member?.tiktok_handle) links.push(`<a href="https://www.tiktok.com/@${encodeURIComponent(member.tiktok_handle)}" target="_blank" rel="noopener nofollow" class="plink">${F.icons.tiktok}@${F.esc(member.tiktok_handle)}</a>`);
+      bio.innerHTML = `${member?.bio ? `<p class="pbio-text">${F.esc(member.bio)}</p>` : ""}${links.length ? `<div class="plinks">${links.join("")}</div>` : ""}`;
+    }
+    renderFollow(); renderLevel(); renderDmBtn();
     const ed = F.$("#pedit");
     if (!F.auth.enabled) ed.innerHTML = "";
     else if (me) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Edit profile</button>`; F.$("#edit-btn").onclick = openEdit; }
@@ -183,9 +214,16 @@
     const m = F.h(`<div class="modal-bg"><div class="modal">
       <h3>Edit profile</h3><p>Your name and picture show in chat, on the leaderboard and on your profile.</p>
       <label class="edit-avatar" title="Change picture"><img id="ea-img" src="${F.avatarOf(p)}" alt=""><span>${F.icons.edit}</span><input type="file" accept="image/*" id="ea-file" hidden></label>
+      <label class="edit-banner" title="Change banner" style="${p.banner_url ? `background-image:url('${F.esc(p.banner_url)}')` : ""}"><span>${F.icons.edit} Banner</span><input type="file" accept="image/*" id="eb-file" hidden></label>
       <label class="label" for="ea-name">Display name</label>
       <input class="input" id="ea-name" maxlength="20" placeholder="e.g. moonboy" value="${F.esc(p.name || "")}">
-      <p class="note" style="margin:6px 0 16px">2–20 characters: letters, numbers, spaces, _ . -</p>
+      <p class="note" style="margin:6px 0 12px">2–20 characters: letters, numbers, spaces, _ . - · People can mention you as @${F.esc(F.handleOf(p) || "yourname")}</p>
+      <label class="label" for="ea-bio">Bio</label>
+      <textarea class="input" id="ea-bio" maxlength="160" rows="2" style="height:auto;padding:10px 12px;resize:none" placeholder="Tell people what you trade…">${F.esc(p.bio || "")}</textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 16px">
+        <div><label class="label" for="ea-x">X (Twitter)</label><input class="input" id="ea-x" maxlength="16" placeholder="handle" value="${F.esc(p.x_handle || "")}"></div>
+        <div><label class="label" for="ea-tt">TikTok</label><input class="input" id="ea-tt" maxlength="25" placeholder="handle" value="${F.esc(p.tiktok_handle || "")}"></div>
+      </div>
       <div style="display:flex;gap:8px">
         ${p.avatar_url ? '<button class="btn btn-ghost" id="ea-rm">Remove picture</button>' : ""}
         <span style="flex:1"></span><button class="btn btn-ghost" id="ea-cancel">Cancel</button><button class="btn btn-primary" id="ea-save">Save</button>
@@ -195,6 +233,8 @@
     m.addEventListener("click", (e) => { if (e.target === m) close(); });
     F.$("#ea-cancel", m).onclick = close;
     F.$("#ea-file", m).onchange = (e) => { file = e.target.files[0]; if (file) F.$("#ea-img", m).src = URL.createObjectURL(file); };
+    let bannerFile = null;
+    F.$("#eb-file", m).onchange = (e) => { bannerFile = e.target.files[0]; if (bannerFile) F.$(".edit-banner", m).style.backgroundImage = `url('${URL.createObjectURL(bannerFile)}')`; };
     let removePic = false;
     const rm = F.$("#ea-rm", m); if (rm) rm.onclick = () => { removePic = true; file = null; F.$("#ea-img", m).src = F.avatar(p.wallet); rm.remove(); };
     F.$("#ea-save", m).onclick = async () => {
@@ -205,6 +245,15 @@
         if (name !== (p.name || "")) fields.name = name || null;
         if (file) fields.avatar_url = await F.auth.uploadAvatar(file);
         else if (removePic) fields.avatar_url = null;
+        if (bannerFile) fields.banner_url = await F.auth.uploadBanner(bannerFile);
+        const bio = F.$("#ea-bio", m).value.trim().replace(/\s+/g, " ");
+        if (bio !== (p.bio || "")) fields.bio = bio || null;
+        const xh = F.$("#ea-x", m).value.trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//, "");
+        if (xh && !/^[A-Za-z0-9_]{1,15}$/.test(xh)) throw new Error("X handle can only have letters, numbers and _ (max 15)");
+        if (xh !== (p.x_handle || "")) fields.x_handle = xh || null;
+        const th = F.$("#ea-tt", m).value.trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/, "");
+        if (th && !/^[A-Za-z0-9_.]{2,24}$/.test(th)) throw new Error("TikTok handle can only have letters, numbers, _ and . (2–24)");
+        if (th !== (p.tiktok_handle || "")) fields.tiktok_handle = th || null;
         if (Object.keys(fields).length) member = await F.auth.updateProfile(fields);
         renderIdentity(); close(); F.toast("Profile saved");
       } catch (e) { F.toast("Couldn't save", F.esc(e.message), "err"); btn.disabled = false; btn.textContent = "Save"; }

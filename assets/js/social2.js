@@ -160,14 +160,15 @@
   const stats = new Map();   // profile id -> stats
   let topWeek, topWeekP = null;
   const BADGES = [
-    { id: "early", ic: "🌊", name: "Early member", why: "One of the first 100 members", test: (s) => s.join_rank > 0 && s.join_rank <= 100 },
+    { id: "early", ic: "🌊", name: "Early member", why: "One of the first 10,000 members", test: (s) => s.join_rank > 0 && s.join_rank <= 10000 },
     { id: "top", ic: "🏆", name: "Top poster of the week", why: "Most likes received this week", test: (s) => s.id === topWeek },
     { id: "poster", ic: "✍️", name: "Poster", why: "10+ posts", test: (s) => s.posts >= 10 },
     { id: "popular", ic: "🔥", name: "Popular", why: "50+ likes received", test: (s) => s.likes >= 50 },
     { id: "social", ic: "🤝", name: "Social", why: "10+ followers", test: (s) => s.followers >= 10 },
     { id: "trader", ic: "💱", name: "Trader", why: "10+ trades on FLOW", test: (s) => s.trades >= 10 },
+    { id: "streak", ic: "🔥", name: "On fire", why: "7-day visit streak", test: (s) => s.streak >= 7 },
   ];
-  const xpOf = (s) => s.posts * 10 + s.likes * 3 + s.comments * 4 + s.trades * 8 + s.followers * 6;
+  const xpOf = (s) => s.posts * 10 + s.likes * 3 + s.comments * 4 + s.trades * 8 + s.followers * 6 + (s.checkins || 0) * 5;
   const levelOf = (xp) => Math.min(99, Math.floor(Math.sqrt(xp / 40)) + 1);
   const xpFor = (lvl) => 40 * (lvl - 1) ** 2;
   F.levels = {
@@ -212,9 +213,56 @@
   let lvlTimer;
   new MutationObserver(() => { clearTimeout(lvlTimer); lvlTimer = setTimeout(() => F.fillLevels(), 250); }).observe(document.body, { childList: true, subtree: true });
 
+  /* ================= daily streak ================= */
+  F.streak = null;
+  async function checkin() {
+    if (!me()) return;
+    const key = "checkin_" + me().id + "_" + new Date().toISOString().slice(0, 10);
+    const { data } = await F.sb.rpc("do_checkin");
+    const r = Array.isArray(data) ? data[0] : data;
+    if (!r) return;
+    F.streak = r.streak;
+    if (r.new_today && !F.store.get(key, false)) {
+      F.store.set(key, true);
+      F.toast(`🔥 ${r.streak}-day streak!`, r.streak > 1 ? `Welcome back. +5 XP — come back tomorrow to keep it going.` : `+5 XP for visiting today. Come back tomorrow to start a streak.`);
+      F.levels.forget(me().id);
+    }
+    document.dispatchEvent(new CustomEvent("flow:streak"));
+  }
+
+  /* ================= direct messages: unread count in the menu ================= */
+  F.dm = { unread: 0, chan: null };
+  async function loadDmUnread() {
+    if (!me()) { F.dm.unread = 0; paintDm(); return; }
+    const { count } = await F.sb.from("dm_messages").select("id", { count: "exact", head: true }).eq("recipient_id", me().id).eq("read", false);
+    F.dm.unread = count || 0; paintDm();
+    if (F.dm.chan) F.sb.removeChannel(F.dm.chan);
+    F.dm.chan = F.sb.channel("flow-dm-" + me().id)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages", filter: `recipient_id=eq.${me().id}` }, ({ new: m }) => {
+        document.dispatchEvent(new CustomEvent("flow:dm", { detail: m }));
+        if (F.dm.openWith === m.sender_id) return;
+        F.dm.unread++; paintDm();
+        F.sb.from("profiles").select("name,wallet").eq("id", m.sender_id).single().then(({ data }) =>
+          F.toast(`💬 ${F.displayName(data || {}, "")}`, `${F.esc(m.body.slice(0, 80))} · <a href="messages.html?to=${m.sender_id}">Reply</a>`));
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages", filter: `sender_id=eq.${me().id}` }, ({ new: m }) =>
+        document.dispatchEvent(new CustomEvent("flow:dm", { detail: m })))
+      .subscribe();
+  }
+  function paintDm() {
+    const a = F.$('.nav a[data-nav="messages"]'); if (!a) return;
+    let b = F.$(".nav-badge", a);
+    if (!F.dm.unread) { b?.remove(); return; }
+    if (!b) { b = F.h('<span class="nav-badge"></span>'); a.appendChild(b); }
+    b.textContent = F.dm.unread > 99 ? "99+" : F.dm.unread;
+  }
+  F.dm.refresh = loadDmUnread;
+
   /* ---------------- boot ---------------- */
+  let lastAuthId = null;
   const onAuth = async () => {
     await F.follows.load();
+    if ((me()?.id || null) !== lastAuthId) { lastAuthId = me()?.id || null; checkin(); loadDmUnread(); }
     if (!me() || N.forId !== me().id) await loadNotifications();
     else renderBell();
     document.dispatchEvent(new CustomEvent("flow:follows-ready"));

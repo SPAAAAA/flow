@@ -30,6 +30,10 @@
   root.innerHTML = `
     <div class="section-title"><h2><span class="live-dot"></span>Now trending</h2><span class="muted" id="updated"></span></div>
     <div class="hero" id="hero">${Array(4).fill('<div class="skeleton" style="height:170px"></div>').join("")}</div>
+    <div id="flowtrend" class="hidden">
+      <div class="section-title"><h2>🌊 Trending on ${F.esc(F.cfg.siteName)}</h2><span class="muted" style="font-size:12px">Most posted about & traded by members · 24h</span></div>
+      <div class="flow-trend" id="flowtrend-row"></div>
+    </div>
     <div class="toolbar">
       <div class="tabs" id="tabs">${TABS.map((t) => `<button data-tab="${t.id}">${t.label}</button>`).join("")}</div>
       <div class="spacer"></div>
@@ -133,8 +137,29 @@
   }
   function tickUpdated() { const u = F.$("#updated"); if (u && state.updated) u.textContent = "Updated " + F.ago(state.updated) + " ago"; }
 
+  async function loadFlowTrending() {
+    if (!F.auth?.enabled || !F.sb) return;
+    try {
+      const { data } = await F.sb.rpc("flow_trending", { lim: 12 });
+      const rows = data || [];
+      if (!rows.length) { F.$("#flowtrend").classList.add("hidden"); return; }
+      const known = new Map(state.coins.map((c) => [c.mint, c]));
+      const need = rows.map((r) => r.mint).filter((m) => !known.has(m));
+      if (need.length) F.toCoins(await F.dex.tokens(need)).forEach((c) => known.set(c.mint, c));
+      const cards = rows.map((r) => ({ r, c: known.get(r.mint) })).filter((x) => x.c);
+      if (!cards.length) { F.$("#flowtrend").classList.add("hidden"); return; }
+      F.$("#flowtrend-row").innerHTML = cards.map(({ r, c }, i) => `<a class="ft-card" href="coin.html?c=${c.mint}">
+        <span class="ft-rank">${i + 1}</span><img src="${F.img(c.image, c.mint)}" alt="">
+        <div class="ft-main"><div class="ft-name">$${F.esc(c.symbol)} <span class="muted">${F.usd(c.mcap)}</span></div>
+          <div class="ft-meta">👥 ${r.members} · 💬 ${r.posts} · 🔁 ${r.trades} <span class="ft-chg">${F.pct(c.chg.h24)}</span></div></div></a>`).join("");
+      F.$("#flowtrend").classList.remove("hidden");
+    } catch {}
+  }
+
   render();
   load();
+  setTimeout(loadFlowTrending, 800);
+  setInterval(() => { if (!document.hidden) loadFlowTrending(); }, 60000);
   if (state.tab === "watchlist") loadWatch();
   setInterval(() => { if (!document.hidden) load(); }, 30000);
   setInterval(tickUpdated, 5000);

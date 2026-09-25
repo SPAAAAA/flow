@@ -9,6 +9,7 @@
 
   /* ---------------- display helpers ---------------- */
   const cache = new Map(); // wallet -> profile|null
+  F.handleOf = (p) => (p?.name ? p.name.replace(/ /g, "_") : null);
   F.displayName = (p, wallet) => F.esc(p?.name || F.short(p?.wallet || wallet));
   F.avatarOf = (p, wallet) => F.esc(p?.avatar_url || F.avatar(p?.wallet || wallet));
   F.profiles = {
@@ -17,7 +18,7 @@
       const need = [...new Set(list)].filter((w) => w && !cache.has(w));
       for (let i = 0; i < need.length; i += 100) {
         const chunk = need.slice(i, i + 100);
-        const { data } = await F.sb.from("profiles").select("id,wallet,name,avatar_url,last_seen,created_at").in("wallet", chunk);
+        const { data } = await F.sb.from("profiles").select("id,wallet,name,avatar_url,last_seen,created_at,bio,banner_url,x_handle,tiktok_handle").in("wallet", chunk);
         chunk.forEach((w) => cache.set(w, null));
         (data || []).forEach((p) => cache.set(p.wallet, p));
       }
@@ -106,6 +107,31 @@
     if (error) throw new Error(error.message);
     return F.sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
   };
+  A.uploadBanner = async (file) => {
+    const blob = await resizeCover(file, 1200, 300);
+    const path = `${A.profile.id}/banner-${Date.now()}.webp`;
+    const { error } = await F.sb.storage.from("avatars").upload(path, blob, { contentType: "image/webp", upsert: true, cacheControl: "31536000" });
+    if (error) throw new Error(error.message);
+    return F.sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+  };
+  F.resizeCover = resizeCover;
+  function resizeCover(file, w, h, quality = 0.85) {
+    return new Promise((res, rej) => {
+      if (!/^image\//.test(file.type)) return rej(new Error("Please choose an image file"));
+      if (file.size > 10 * 1024 * 1024) return rej(new Error("Image is too large (max 10 MB)"));
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.max(w / img.width, h / img.height);
+        const sw = w / scale, sh = h / scale;
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, w, h);
+        c.toBlob((b) => (b ? res(b) : rej(new Error("Couldn't process image"))), "image/webp", quality);
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => rej(new Error("Couldn't read that image"));
+      img.src = URL.createObjectURL(file);
+    });
+  }
   function resizeImage(file, size) {
     return new Promise((res, rej) => {
       if (!/^image\//.test(file.type)) return rej(new Error("Please choose an image file"));

@@ -508,6 +508,7 @@
     { href: "index.html", label: "Home", icon: "home", key: "home" },
     { href: "leaderboard.html", label: "Leaderboard", icon: "trophy", key: "leaderboard" },
     { href: "post.html", label: "Post", icon: "edit", key: "post" },
+    { href: "messages.html", label: "Messages", icon: "chat", key: "messages" },
     { href: "index.html?tab=watchlist", label: "Watchlist", icon: "star", key: "watchlist" },
     { href: "profile.html", label: "Profile", icon: "user", key: "profile" },
     { href: "about.html", label: "How it works", icon: "info", key: "about" },
