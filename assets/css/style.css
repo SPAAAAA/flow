@@ -451,3 +451,47 @@ body.has-mbar .chat-fab{bottom:84px}
 .foot-socials a:hover{border-color:var(--accent);color:var(--text)}
 .foot-socials svg{width:15px;height:15px}
 .sidebar-foot .socials a:hover{color:var(--accent-2)}
+
+/* ---------- notifications bell ---------- */
+.bell-slot{position:relative}
+.bell{position:relative;width:40px;height:40px;border-radius:10px;background:var(--panel);border:1px solid var(--border);display:grid;place-items:center;color:var(--text-2)}
+.bell:hover{color:var(--text);border-color:var(--border-2)}
+.bell svg{width:18px;height:18px}
+.bell-badge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;box-shadow:0 0 0 2px var(--bg)}
+.notif-panel{position:absolute;right:0;top:48px;width:min(380px,calc(100vw - 24px));max-height:70vh;overflow:auto;background:var(--panel);border:1px solid var(--border-2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.55);z-index:60}
+.notif-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel)}
+.linkish{color:var(--accent-2);font-size:13px;font-weight:600}
+.linkish:hover{text-decoration:underline}
+.notif{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13.5px;color:var(--text-2)}
+.notif:last-child{border-bottom:0}
+.notif:hover{background:var(--panel-2)}
+.notif.unread{background:var(--accent-soft)}
+.notif img{width:32px;height:32px;border-radius:50%;object-fit:cover;flex:none}
+.notif b{color:var(--text)}
+.notif-ic{width:18px;text-align:center;flex:none}
+.notif-txt{min-width:0;line-height:1.35}
+.notif-empty{padding:26px 16px;text-align:center;color:var(--text-2);font-size:13.5px;line-height:1.6}
+
+/* ---------- follows ---------- */
+.follow-counts{display:flex;align-items:center;gap:14px;margin-top:8px;flex-wrap:wrap}
+.follow-counts .linkish{color:var(--text-2);font-weight:500}
+.follow-counts .linkish b{color:var(--text)}
+.btn.following{color:var(--text-2)}
+.btn.following:hover{border-color:var(--down);color:var(--down)}
+.follow-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.follow-row:last-child{border-bottom:0}
+.follow-who{display:flex;align-items:center;gap:10px;min-width:0}
+.follow-who img{width:38px;height:38px;border-radius:50%;object-fit:cover}
+.follow-who .n{font-weight:700}
+.follow-who .s{font-size:12px;color:var(--muted)}
+.follow-list{max-height:60vh;overflow:auto}
+
+/* ---------- coin threads ---------- */
+.coin-chip{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:3px 10px 3px 4px;border-radius:999px;background:var(--panel-2);border:1px solid var(--border);font-size:12px;color:var(--text-2)}
+.coin-chip:hover{border-color:var(--accent)}
+.coin-chip img{width:18px;height:18px;border-radius:50%;object-fit:cover}
+.coin-chip b{color:var(--accent-2)}
+.tab-count{display:inline-block;min-width:18px;padding:0 6px;margin-left:4px;border-radius:999px;background:var(--panel-3);font-size:11px;color:var(--text-2)}
+.tab-count:empty{display:none}
+.thread-composer{background:var(--bg-2)}
+#tabbody .feed{background:transparent;border-radius:12px}
