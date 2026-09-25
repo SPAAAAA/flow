@@ -53,6 +53,12 @@ window.FLOW_CONFIG = {
   // Wallets that get the FOUNDER badge (only editable here in the repo)
   founders: ["5ZfqZdmid5jMVixfTZULPNvzRKtxxfCXYW6Xn8E6yDn7"],
 
-  // Social links in the sidebar (leave "" to hide)
-  socials: { x: "", telegram: "", discord: "" }
+  // Social links shown in the sidebar and page footer (leave "" to hide)
+  socials: {
+    discord: "https://discord.gg/r9q5V9vGsQ",
+    instagram: "https://www.instagram.com/flow.solana/",
+    tiktok: "https://www.tiktok.com/@flow.solana",
+    x: "",
+    telegram: ""
+  }
 };

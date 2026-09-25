@@ -110,6 +110,8 @@
     x: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.8 8 10.2h-6.3l-4.9-6.4L5.3 21H2.2l7.3-8.3L1.8 3h6.4l4.4 5.9zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>',
     telegram: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3 18.7 19.4c-.2 1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.3-5 9.2-8.3c.4-.4-.1-.6-.6-.2L6.2 13 1.3 11.5c-1-.3-1.1-1 .2-1.5L20.6 2.6c.9-.3 1.6.2 1.3 1.7z"/></svg>',
     discord: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 5.3A18 18 0 0 0 15.6 4l-.6 1.1a16.6 16.6 0 0 0-5 0L9.4 4A18 18 0 0 0 5 5.3 18.6 18.6 0 0 0 1.8 17.9 18 18 0 0 0 7.3 20.7l1.2-1.9a11 11 0 0 1-1.9-.9l.5-.4a12.9 12.9 0 0 0 11 0l.5.4-1.9.9 1.2 1.9a18 18 0 0 0 5.5-2.8A18.5 18.5 0 0 0 20 5.3zM8.7 15.3c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2zm6.6 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2z"/></svg>',
+    instagram: I('<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>'),
+    tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 2h-3.4v13.4a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 1 0 5.4 6.3V8.6a7.9 7.9 0 0 0 4.4 1.4V6.6a4.5 4.5 0 0 1-4.4-4.6z"/></svg>',
     globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
     logout: I('<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>'),
     close: I('<path d="M6 6l12 12M18 6 6 18"/>'),
@@ -513,7 +515,9 @@
     const body = document.body;
     const content = F.$("#page");
     const soc = CFG.socials || {};
-    const socials = ["x", "telegram", "discord"].filter((k) => soc[k]).map((k) => `<a href="${F.esc(soc[k])}" target="_blank" rel="noopener" aria-label="${k}">${F.icons[k]}</a>`).join("");
+    const SOC = { discord: "Discord", instagram: "Instagram", tiktok: "TikTok", x: "X", telegram: "Telegram" };
+    const socials = Object.keys(SOC).filter((k) => soc[k]).map((k) => `<a href="${F.esc(soc[k])}" target="_blank" rel="noopener" aria-label="${SOC[k]}" title="${F.esc(CFG.siteName)} on ${SOC[k]}">${F.icons[k]}</a>`).join("");
+    const footSocials = Object.keys(SOC).filter((k) => soc[k]).map((k) => `<a href="${F.esc(soc[k])}" target="_blank" rel="noopener">${F.icons[k]}<span>${SOC[k]}</span></a>`).join("");
     const app = F.h(`<div class="app">
       <aside class="sidebar" id="sidebar">
         <a class="brand" href="index.html"><span class="brand-mark">${F.logo}</span><span class="brand-name">${F.esc(CFG.siteName)}</span></a>
@@ -531,7 +535,7 @@
           <div class="topbar-right" id="wallet-slot"></div>
         </header>
         <main class="content" id="content"></main>
-        <footer class="footer"><span>Market data: DEX Screener & GeckoTerminal · Swaps routed by Jupiter</span><span>Meme coins are extremely risky. Only trade what you can afford to lose.</span></footer>
+        <footer class="footer">${footSocials ? `<div class="foot-socials"><b>Follow ${F.esc(CFG.siteName)}</b>${footSocials}</div>` : ""}<span>Market data: DEX Screener & GeckoTerminal · Swaps routed by Jupiter</span><span>Meme coins are extremely risky. Only trade what you can afford to lose.</span></footer>
       </div></div>`);
     F.$("#content", app).appendChild(content);
     body.prepend(app);
