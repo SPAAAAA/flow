@@ -91,7 +91,7 @@
   }
   function msgBubble(m) {
     const mine = m.sender_id === me().id;
-    return `<div class="dm-msg ${mine ? "mine" : ""}" title="${new Date(m.created_at).toLocaleString()}"><div class="dm-bubble">${F.esc(m.body)}</div><span class="dm-time">${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>`;
+    return `<div class="dm-msg ${mine ? "mine" : ""}" title="${new Date(m.created_at).toLocaleString()}"><div class="dm-bubble">${F.esc(m.body)}</div>${!mine && F.reportBtn ? F.reportBtn("dm", m.id, "msg-rep") : ""}<span class="dm-time">${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>`;
   }
   function drawMsgs(scroll) {
     const el = F.$("#dm-msgs"); if (!el) return;

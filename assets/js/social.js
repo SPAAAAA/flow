@@ -18,7 +18,7 @@
       const need = [...new Set(list)].filter((w) => w && !cache.has(w));
       for (let i = 0; i < need.length; i += 100) {
         const chunk = need.slice(i, i + 100);
-        const { data } = await F.sb.from("profiles").select("id,wallet,name,avatar_url,last_seen,created_at,bio,banner_url,x_handle,tiktok_handle").in("wallet", chunk);
+        const { data } = await F.sb.from("profiles").select("id,wallet,name,avatar_url,last_seen,created_at,bio,banner_url,x_handle,tiktok_handle,banned").in("wallet", chunk);
         chunk.forEach((w) => cache.set(w, null));
         (data || []).forEach((p) => cache.set(p.wallet, p));
       }
@@ -258,7 +258,7 @@
     return `<div class="msg ${mine ? "mine" : ""}" data-id="${m.id}">
       <a href="profile.html?a=${F.esc(p.wallet || "")}"><img src="${F.avatarOf(p)}" alt=""></a>
       <div class="msg-body"><div class="msg-top"><a href="profile.html?a=${F.esc(p.wallet || "")}" class="msg-name">${F.displayName(p)}</a>${F.founderBadge(p.wallet, true)}${F.lvlTag ? F.lvlTag(p.id || m.user_id) : ""}${F.online.has(p.wallet) ? '<span class="online-dot" title="Online"></span>' : ""}
-        <span class="msg-time" title="${t.toLocaleString()}">${t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>${canDel ? `<button class="msg-del" data-del="${m.id}" title="Delete">×</button>` : ""}</div>
+        <span class="msg-time" title="${t.toLocaleString()}">${t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>${F.reportBtn && !mine ? F.reportBtn("chat", m.id, "msg-rep") : ""}${canDel ? `<button class="msg-del" data-del="${m.id}" title="Delete">×</button>` : ""}</div>
         <div class="msg-text">${linkify(F.esc(m.body))}</div></div></div>`;
   }
   function linkify(s) {

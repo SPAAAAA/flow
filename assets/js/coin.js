@@ -23,6 +23,7 @@
   <div class="coin-layout">
     <div class="coin-main">
       <div class="coin-head" id="head"><div class="skeleton" style="width:56px;height:56px;border-radius:14px"></div><div class="skeleton" style="width:220px;height:40px"></div></div>
+      <div id="riskbar"></div>
       <div class="stats" id="stats">${Array(6).fill('<div class="skeleton" style="height:66px"></div>').join("")}</div>
       <div class="panel">
         <div class="chart-bar" id="tfbar">
@@ -63,7 +64,7 @@
       S.coin = { mint, name: t?.name || "Unknown token", symbol: t?.symbol || "???", image: t?.icon, priceUsd: t?.usdPrice, mcap: t?.mcap, liq: t?.liquidity, vol: {}, chg: {}, txns: {}, websites: [], socials: [], pair: null, dexId: t?.launchpad || "", onCurve: false, isPump: /pump$/.test(mint) };
     }
     document.title = `${S.coin.name} ($${S.coin.symbol}) — ${CFG.siteName}`;
-    renderHead(); renderStats(); renderCurve(); renderTradeStatic();
+    renderHead(); renderStats(); renderCurve(); renderTradeStatic(); renderRisk();
   }
 
   async function loadInfo() {
@@ -72,7 +73,7 @@
     if (S.decimals == null) {
       try { S.decimals = (await F.rpc("getTokenSupply", [mint])).value.decimals; } catch { S.decimals = 6; }
     }
-    renderStats(); renderSafety();
+    renderStats(); renderSafety(); renderRisk();
     if (S.tab === "about") renderAbout();
   }
 
@@ -145,7 +146,44 @@
       ${a.devBalancePercentage != null ? row("Dev holds", a.devBalancePercentage < 5, a.devBalancePercentage.toFixed(2) + "%") : ""}
       ${t.organicScoreLabel ? row("Organic activity", t.organicScoreLabel === "high" ? true : t.organicScoreLabel === "low" ? false : null, t.organicScoreLabel) : ""}
       ${t.isVerified ? row("Jupiter verified", true, "Yes") : ""}
-      <p class="note">Automated checks from Jupiter. Not a guarantee — always do your own research.</p>`;
+      <p class="note">Automated checks from Jupiter. Not a guarantee — always do your own research.</p>
+      ${F.auth?.enabled ? `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" data-report="coin:${mint}">${F.icons.flag}Report as scam</button>` : ""}`;
+  }
+
+  /* ---------------- risk warnings ---------------- */
+  let coinReports = 0, riskOpen = false;
+  const riskAck = new Set(F.store.get("riskAck", []));
+  function risk() { return F.coinRisk ? F.coinRisk(S.coin, S.info, coinReports) : { level: "unknown", flags: [] }; }
+  function renderRisk() {
+    const el = F.$("#riskbar"); if (!el) return;
+    const r = risk();
+    if (r.level !== "high" && r.level !== "medium") { el.innerHTML = ""; return; }
+    const hi = r.level === "high";
+    el.innerHTML = `<div class="riskbar ${hi ? "hi" : "md"}">
+      <button class="riskbar-top" id="risktoggle"><span class="riskbar-ic">${hi ? "⚠" : "!"}</span>
+        <span class="riskbar-main"><b>${hi ? "High risk — be careful with this coin" : "Some risk signals"}</b><span>${r.flags.map((f) => F.esc(f.title)).slice(0, 3).join(" · ")}${r.flags.length > 3 ? ` · +${r.flags.length - 3} more` : ""}</span></span>
+        <span class="riskbar-more">${riskOpen ? "Hide" : "Details"}</span></button>
+      ${riskOpen ? `<ul class="riskbar-list">${r.flags.map((f) => `<li class="${f.sev}"><b>${F.esc(f.title)}</b> — ${F.esc(f.text)}</li>`).join("")}</ul>
+        <p class="riskbar-note">Automated checks plus member reports. Low risk never means safe — only trade what you can afford to lose.</p>` : ""}</div>`;
+    F.$("#risktoggle").onclick = () => { riskOpen = !riskOpen; renderRisk(); };
+  }
+  F.coinReports && F.coinReports(mint).then((n) => { coinReports = n; renderRisk(); });
+  document.addEventListener("flow:reported", (e) => { if (e.detail.kind === "coin" && e.detail.id === mint) { coinReports++; renderRisk(); } });
+  function riskGate(then) {
+    const r = risk();
+    if (r.level !== "high" || riskAck.has(mint)) return false;
+    const m = F.h(`<div class="modal-bg"><div class="modal" style="max-width:440px">
+      <h3 style="margin:0 0 6px">⚠ High-risk coin</h3>
+      <p style="margin:0 0 10px;font-size:13px">Before you buy $${F.esc(S.coin.symbol)}, know that:</p>
+      <ul class="riskbar-list" style="margin:0 0 12px">${r.flags.filter((f) => f.sev === "high").map((f) => `<li class="high"><b>${F.esc(f.title)}</b> — ${F.esc(f.text)}</li>`).join("")}</ul>
+      <label class="report-opt"><input type="checkbox" id="riskok"><span>I understand I could lose everything I put in.</span></label>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn btn-ghost" data-x>Cancel</button><button class="btn btn-primary" id="riskgo" disabled>Buy anyway</button></div>
+    </div></div>`);
+    m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-x]")) m.remove(); });
+    document.body.appendChild(m);
+    F.$("#riskok", m).onchange = (e) => { F.$("#riskgo", m).disabled = !e.target.checked; };
+    F.$("#riskgo", m).onclick = () => { riskAck.add(mint); F.store.set("riskAck", [...riskAck].slice(-200)); m.remove(); then(); };
+    return true;
   }
 
   /* ---------------- chart ---------------- */
@@ -392,6 +430,7 @@
     const raw = amountRaw();
     if (!raw) return F.toast("Enter an amount", "", "warn");
     const buy = S.mode === "buy";
+    if (buy && riskGate(execute)) return;
     if (buy && S.sol != null && Number(raw) / 1e9 > S.sol - 0.005) return F.toast("Not enough SOL", "Keep a little SOL (≈0.005) for network fees.", "warn");
     if (!buy && S.bal && BigInt(raw) > BigInt(S.bal.raw || 0)) return F.toast("Not enough tokens", "", "warn");
     const go = F.$("#go");

@@ -160,6 +160,7 @@
     const { data } = await F.sb.rpc("can_dm", { a: F.auth.profile.id, b: member.id }).catch(() => ({ data: false }));
     if (data) slot.innerHTML = `<a class="btn btn-ghost btn-sm" href="messages.html?to=${F.esc(member.id)}">${F.icons.chat}Message</a>`;
     else slot.innerHTML = `<button class="btn btn-ghost btn-sm" disabled title="You can message each other once you both follow each other">${F.icons.chat}Message</button>`;
+    if (F.reportBtn) slot.insertAdjacentHTML("beforeend", ` <button class="btn btn-ghost btn-sm" data-report="user:${F.esc(member.id)}" title="Report this member">${F.icons.flag}Report</button>`);
   }
   document.addEventListener("flow:follow", () => setTimeout(renderDmBtn, 300));
   let counts = null, countsFor = null;
@@ -186,7 +187,7 @@
   function renderIdentity() {
     if (!F.$("#pname")) return;
     const me = F.auth.isMe?.(addr), connectedHere = F.wallet.pubkey === addr;
-    F.$("#pname").innerHTML = `${member?.name ? F.esc(member.name) : F.short(addr, 6)} ${F.founderBadge(addr)} ${me || connectedHere ? '<span class="badge blue">You</span>' : ""}`;
+    F.$("#pname").innerHTML = `${member?.name ? F.esc(member.name) : F.short(addr, 6)} ${F.founderBadge(addr)} ${me || connectedHere ? '<span class="badge blue">You</span>' : ""}${member?.banned ? ' <span class="badge suspended" title="This account was suspended for breaking the rules">Suspended</span>' : ""}`;
     F.$("#pav").src = member?.avatar_url || F.avatar(addr);
     F.$("#psince").textContent = member ? `Member since ${new Date(member.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : "";
     F.$("#pdot").classList.toggle("hidden", !F.online.has(addr));

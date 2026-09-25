@@ -152,6 +152,7 @@
           <button class="pa pa-comment" data-comments="${p.id}" title="Comments">${bubble}<span>${p.comment_count || ""}</span></button>
           <button class="pa pa-like ${on ? "on" : ""}" data-like="${p.id}" title="${on ? "Unlike" : "Like"}">${heart(on)}<span>${p.like_count || ""}</span></button>
           <button class="pa pa-share" data-share="${p.id}" title="Copy link">${linkIc}</button>
+          ${F.reportBtn && !(me() && me().id === p.user_id) ? F.reportBtn("post", p.id) : ""}
         </div>
         <div class="post-comments ${openComments.has(p.id) ? "" : "hidden"}" id="pc-${p.id}"></div>
       </div></article>`;
@@ -220,7 +221,7 @@
     return `<div class="cmt" data-cmt="${c.id}">
       <a href="profile.html?a=${F.esc(u.wallet || "")}"><img src="${F.avatarOf(u)}" alt=""></a>
       <div class="cmt-body"><div class="cmt-top"><a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-name">${F.displayName(u)}</a>${F.founderBadge(u.wallet, true)}${F.lvlTag ? F.lvlTag(u.id || c.user_id) : ""}
-        <span class="muted">· ${when(c.created_at)}</span>${canMod(c.user_id) ? `<button class="msg-del" data-del-cmt="${c.id}" data-post-of="${c.post_id}" title="Delete">×</button>` : ""}</div>
+        <span class="muted">· ${when(c.created_at)}</span>${F.reportBtn && !(me() && me().id === c.user_id) ? F.reportBtn("comment", c.id, "msg-rep") : ""}${canMod(c.user_id) ? `<button class="msg-del" data-del-cmt="${c.id}" data-post-of="${c.post_id}" title="Delete">×</button>` : ""}</div>
         <div class="post-text">${fmtText(c.body)}</div></div></div>`;
   }
   async function toggleComments(id, forceOpen) {
