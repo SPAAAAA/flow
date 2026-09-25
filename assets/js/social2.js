@@ -156,6 +156,62 @@
     try { await F.sb.from("trades").insert({ user_id: me().id, mint, symbol: (symbol || "").slice(0, 20) || null, side, sol_amount: sol != null ? Number(sol.toFixed(6)) : null, signature }); } catch {}
   };
 
+  /* ================= levels & badges ================= */
+  const stats = new Map();   // profile id -> stats
+  let topWeek, topWeekP = null;
+  const BADGES = [
+    { id: "early", ic: "🌊", name: "Early member", why: "One of the first 100 members", test: (s) => s.join_rank > 0 && s.join_rank <= 100 },
+    { id: "top", ic: "🏆", name: "Top poster of the week", why: "Most likes received this week", test: (s) => s.id === topWeek },
+    { id: "poster", ic: "✍️", name: "Poster", why: "10+ posts", test: (s) => s.posts >= 10 },
+    { id: "popular", ic: "🔥", name: "Popular", why: "50+ likes received", test: (s) => s.likes >= 50 },
+    { id: "social", ic: "🤝", name: "Social", why: "10+ followers", test: (s) => s.followers >= 10 },
+    { id: "trader", ic: "💱", name: "Trader", why: "10+ trades on FLOW", test: (s) => s.trades >= 10 },
+  ];
+  const xpOf = (s) => s.posts * 10 + s.likes * 3 + s.comments * 4 + s.trades * 8 + s.followers * 6;
+  const levelOf = (xp) => Math.min(99, Math.floor(Math.sqrt(xp / 40)) + 1);
+  const xpFor = (lvl) => 40 * (lvl - 1) ** 2;
+  F.levels = {
+    async load(ids) {
+      if (!topWeekP) topWeekP = F.sb.rpc("top_poster_week").then(({ data }) => { topWeek = data || null; }).catch(() => {});
+      const need = [...new Set(ids)].filter((i) => i && !stats.has(i));
+      for (let i = 0; i < need.length; i += 200) {
+        const chunk = need.slice(i, i + 200);
+        const { data } = await F.sb.rpc("member_stats", { uids: chunk });
+        chunk.forEach((id) => stats.has(id) || stats.set(id, null));
+        (data || []).forEach((r) => {
+          const s = Object.fromEntries(Object.entries(r).map(([k, v]) => [k, k === "id" ? v : Number(v || 0)]));
+          s.xp = xpOf(s); s.level = levelOf(s.xp); stats.set(r.id, s);
+        });
+      }
+      await topWeekP;
+    },
+    get: (id) => stats.get(id) || null,
+    badges: (id) => { const s = stats.get(id); return s ? BADGES.filter((b) => b.test(s)) : []; },
+    info: (id) => {
+      const s = stats.get(id); if (!s) return null;
+      const next = xpFor(s.level + 1), cur = xpFor(s.level);
+      return { ...s, next, pct: Math.min(100, ((s.xp - cur) / Math.max(1, next - cur)) * 100) };
+    },
+    forget: (id) => stats.delete(id),
+  };
+  /* Placeholders: <span class="lvl" data-lvl="PROFILE_ID"></span> get filled with "Lv 3" + top badge */
+  F.lvlTag = (id) => (id ? `<span class="lvl" data-lvl="${F.esc(id)}"></span>` : "");
+  F.fillLevels = async (root = document) => {
+    const els = F.$$("[data-lvl]", root).filter((e) => !e.dataset.done);
+    if (!els.length) return;
+    try { await F.levels.load(els.map((e) => e.dataset.lvl)); } catch { return; }
+    els.forEach((e) => {
+      const s = F.levels.get(e.dataset.lvl); if (!s) return;
+      const b = F.levels.badges(s.id);
+      const top = b.find((x) => x.id === "top") || b.find((x) => x.id === "early");
+      e.innerHTML = `${top ? `<span class="lvl-badge" title="${F.esc(top.name)}">${top.ic}</span>` : ""}<span class="lvl-pill lv${Math.min(5, Math.ceil(s.level / 5))}" title="Level ${s.level} · ${s.xp} XP">Lv ${s.level}</span>`;
+      e.dataset.done = 1;
+    });
+  };
+  /* auto-fill any new placeholders that appear on the page */
+  let lvlTimer;
+  new MutationObserver(() => { clearTimeout(lvlTimer); lvlTimer = setTimeout(() => F.fillLevels(), 250); }).observe(document.body, { childList: true, subtree: true });
+
   /* ---------------- boot ---------------- */
   const onAuth = async () => {
     await F.follows.load();

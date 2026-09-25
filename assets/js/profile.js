@@ -26,6 +26,7 @@
           <h1 id="pname">${F.short(addr, 6)}</h1>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="copy" id="cp">${F.short(addr, 10)} ${F.icons.copy}</button><span class="muted" style="font-size:12px" id="psince"></span></div>
           <div class="follow-counts" id="pfollow"></div>
+          <div class="plevel" id="plevel"></div>
         </div>
         <div class="actions">
           <span id="pedit"></span>
@@ -131,6 +132,16 @@
     if (F.qs("edit") && !openedEdit) { openedEdit = true; if (F.auth.isMe?.(addr)) openEdit(); }
   }
   let openedEdit = false;
+  async function renderLevel() {
+    const el = F.$("#plevel"); if (!el) return;
+    if (!F.levels || !member) { el.innerHTML = ""; return; }
+    try { F.levels.forget(member.id); await F.levels.load([member.id]); } catch { return; }
+    const i = F.levels.info(member.id); if (!i) { el.innerHTML = ""; return; }
+    const b = F.levels.badges(member.id);
+    el.innerHTML = `<div class="plevel-row"><span class="lvl-pill lv${Math.min(5, Math.ceil(i.level / 5))}">Lv ${i.level}</span>
+        <div class="xpbar" title="${i.xp} / ${i.next} XP"><i style="width:${i.pct}%"></i></div><span class="muted" style="font-size:12px">${i.xp} / ${i.next} XP</span></div>
+      ${b.length ? `<div class="badge-row">${b.map((x) => `<span class="mbadge" title="${F.esc(x.why)}">${x.ic} ${F.esc(x.name)}</span>`).join("")}</div>` : ""}`;
+  }
   let counts = null, countsFor = null;
   async function renderFollow() {
     const el = F.$("#pfollow"); if (!el) return;
@@ -159,7 +170,7 @@
     F.$("#psince").textContent = member ? `Member since ${new Date(member.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : "";
     F.$("#pdot").classList.toggle("hidden", !F.online.has(addr));
     if (member?.name) document.title = `${member.name} — ${F.cfg.siteName}`;
-    renderFollow();
+    renderFollow(); renderLevel();
     const ed = F.$("#pedit");
     if (!F.auth.enabled) ed.innerHTML = "";
     else if (me) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Edit profile</button>`; F.$("#edit-btn").onclick = openEdit; }

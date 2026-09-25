@@ -100,7 +100,7 @@
     F.$("#sub").textContent = `${online.length} member${online.length === 1 ? "" : "s"} online now`;
     const card = (m, on) => `<a class="member" href="profile.html?a=${F.esc(m.wallet)}">
       <div class="avatar-wrap"><img src="${F.esc(m.avatar || m.avatar_url || F.avatar(m.wallet))}" alt="">${on ? '<span class="online-dot" style="position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border:2px solid var(--panel);margin:0"></span>' : ""}</div>
-      <div style="min-width:0"><div class="n">${F.esc(m.name || F.short(m.wallet))} ${F.founderBadge(m.wallet, true)}${F.auth.isMe(m.wallet) ? ' <span class="badge blue">You</span>' : ""}</div>
+      <div style="min-width:0"><div class="n">${F.esc(m.name || F.short(m.wallet))} ${F.founderBadge(m.wallet, true)}${m.id && F.lvlTag ? F.lvlTag(m.id) : ""}${F.auth.isMe(m.wallet) ? ' <span class="badge blue">You</span>' : ""}</div>
       <div class="s">${on ? "Online now" : "Last seen " + F.ago(Date.parse(m.last_seen)) + " ago"}</div></div></a>`;
     const signInCta = !F.auth.profile ? `<div class="empty-state" style="margin-bottom:16px;padding:22px"><b>Want to show up here?</b>Sign in with your wallet — it's free and only proves you own it.<div style="margin-top:12px"><button class="btn btn-primary" id="mem-signin">${F.wallet.connected ? "Sign in with wallet" : "Connect wallet"}</button></div></div>` : "";
     body.innerHTML = `${signInCta}
@@ -108,7 +108,7 @@
       ${online.length ? `<div class="members">${online.sort((a, b) => (a.name || "~").localeCompare(b.name || "~")).map((m) => card(m, true)).join("")}</div>` : `<div class="empty-state"><b>Nobody signed in right now</b>Members appear here the moment they're on ${F.esc(F.cfg.siteName)}.</div>`}
       <h3 style="margin:26px 0 12px;font-size:15px">Recently active</h3><div id="recent"><div class="skeleton" style="height:120px"></div></div>`;
     const b = F.$("#mem-signin"); if (b) b.onclick = F.auth.signIn;
-    const { data } = await F.sb.from("profiles").select("wallet,name,avatar_url,last_seen").order("last_seen", { ascending: false }).limit(60);
+    const { data } = await F.sb.from("profiles").select("id,wallet,name,avatar_url,last_seen").order("last_seen", { ascending: false }).limit(60);
     if (S.tab !== "members") return;
     const rest = (data || []).filter((m) => !F.online.has(m.wallet));
     F.$("#recent").innerHTML = rest.length ? `<div class="members">${rest.map((m) => card(m, false)).join("")}</div>` : `<p class="muted">No other members yet.</p>`;

@@ -8,6 +8,52 @@
   const openComments = new Set();
   let ctxCoin = null;            // coin page we're rendering a thread for (hide its own chip)
   const coinMeta = new Map();
+
+  /* ---------------- call tracking ----------------
+     A post that is about a coin (posted in its thread, or containing its address)
+     is a "call". We look up the coin's price at the moment of posting from public
+     chart data (so nobody can fake it) and compare it with the price now. */
+  const CA_RE = /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/;
+  const callMint = (p) => p.coin_mint || (p.body.match(CA_RE) || [])[1] || null;
+  const candleCache = new Map(); // key -> Promise<candles>
+  function candles(pool, tf, agg) {
+    const k = pool + tf + agg;
+    if (!candleCache.has(k)) candleCache.set(k, F.gecko.ohlcv(pool, tf, agg, 1000).catch(() => []));
+    return candleCache.get(k);
+  }
+  async function priceAt(pool, t) {
+    const sec = Math.floor(t / 1000), age = Date.now() - t;
+    // 15-minute candles cover ~10 days, 4-hour candles ~5 months
+    const list = age < 9.5 * 864e5 ? await candles(pool, "minute", 15) : await candles(pool, "hour", 4);
+    if (!list.length || sec < list[0].time) return null;
+    let best = null;
+    for (const c of list) { if (c.time <= sec) best = c; else break; }
+    return best ? best.close : null;
+  }
+  async function fillCalls(root = document) {
+    const els = F.$$("[data-call]:not([data-done])", root); if (!els.length) return;
+    els.forEach((e) => (e.dataset.done = 1));
+    const mints = [...new Set(els.map((e) => e.dataset.call))];
+    const need = mints.filter((m) => !coinMeta.has(m));
+    if (need.length) { try { F.toCoins(await F.dex.tokens(need)).forEach((c) => coinMeta.set(c.mint, c)); } catch {} need.forEach((m) => coinMeta.has(m) || coinMeta.set(m, null)); }
+    for (const e of els) {
+      const c = coinMeta.get(e.dataset.call);
+      if (!c || !c.pair || !c.priceUsd) { e.remove(); continue; }
+      const t = Number(e.dataset.at);
+      if (Date.now() - t < 5 * 60e3) { e.innerHTML = `<span class="call-pill neutral">📍 Called at ${F.usd(c.mcap)} MC</span>`; continue; }
+      const then = await priceAt(c.pair, t);
+      if (!then) { e.remove(); continue; }
+      const chg = (c.priceUsd / then - 1) * 100;
+      const mcThen = c.mcap ? c.mcap * (then / c.priceUsd) : null;
+      const up = chg >= 0;
+      e.innerHTML = `<a class="call-pill ${up ? "up" : "down"}" href="coin.html?c=${F.esc(c.mint)}" title="Price when posted: ${F.price(then)} · now: ${F.price(c.priceUsd)}">
+        ${up ? "📈" : "📉"} <b>${up ? "+" : ""}${Math.abs(chg) >= 1000 ? Math.round(chg).toLocaleString() : chg.toFixed(chg > -10 && chg < 10 ? 1 : 0)}%</b> since call
+        <span class="muted">· $${F.esc(c.symbol)}${mcThen ? ` ${F.usd(mcThen)} → ${F.usd(c.mcap)} MC` : ""}</span></a>`;
+    }
+  }
+  F.fillCalls = fillCalls;
+  let callTimer;
+  new MutationObserver(() => { clearTimeout(callTimer); callTimer = setTimeout(() => fillCalls(), 300); }).observe(document.body, { childList: true, subtree: true });
   async function fillCoinChips(root = document) {
     const chips = F.$$("[data-coinchip]", root); if (!chips.length) return;
     const need = [...new Set(chips.map((c) => c.dataset.coinchip))].filter((m) => !coinMeta.has(m));
@@ -40,13 +86,14 @@
       <a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-av"><img src="${F.avatarOf(u)}" alt=""></a>
       <div class="post-main">
         <div class="post-top">
-          <a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-name">${F.displayName(u)}</a>${F.founderBadge(u.wallet, true)}
+          <a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-name">${F.displayName(u)}</a>${F.founderBadge(u.wallet, true)}${F.lvlTag ? F.lvlTag(u.id || p.user_id) : ""}
           <span class="post-handle mono">${F.short(u.wallet || "")}</span><span class="muted">·</span>
           <a class="post-time" href="post.html?p=${p.id}" title="${new Date(p.created_at).toLocaleString()}">${when(p.created_at)}</a>
           ${canMod(p.user_id) ? `<button class="post-del" data-del-post="${p.id}" title="Delete post">${trash}</button>` : ""}
         </div>
         ${p.coin_mint && p.coin_mint !== ctxCoin ? `<a class="coin-chip" href="coin.html?c=${F.esc(p.coin_mint)}" data-coinchip="${F.esc(p.coin_mint)}"><img src="${F.avatar(p.coin_mint)}" alt="">on <b>${F.short(p.coin_mint)}</b></a>` : ""}
         <div class="post-text">${fmtText(p.body)}</div>
+        ${callMint(p) ? `<div class="call" data-call="${F.esc(callMint(p))}" data-at="${Date.parse(p.created_at)}"></div>` : ""}
         <div class="post-actions">
           <button class="pa pa-comment" data-comments="${p.id}" title="Comments">${bubble}<span>${p.comment_count || ""}</span></button>
           <button class="pa pa-like ${on ? "on" : ""}" data-like="${p.id}" title="${on ? "Unlike" : "Like"}">${heart(on)}<span>${p.like_count || ""}</span></button>
@@ -118,7 +165,7 @@
     const u = c.profiles || {};
     return `<div class="cmt" data-cmt="${c.id}">
       <a href="profile.html?a=${F.esc(u.wallet || "")}"><img src="${F.avatarOf(u)}" alt=""></a>
-      <div class="cmt-body"><div class="cmt-top"><a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-name">${F.displayName(u)}</a>${F.founderBadge(u.wallet, true)}
+      <div class="cmt-body"><div class="cmt-top"><a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-name">${F.displayName(u)}</a>${F.founderBadge(u.wallet, true)}${F.lvlTag ? F.lvlTag(u.id || c.user_id) : ""}
         <span class="muted">· ${when(c.created_at)}</span>${canMod(c.user_id) ? `<button class="msg-del" data-del-cmt="${c.id}" data-post-of="${c.post_id}" title="Delete">×</button>` : ""}</div>
         <div class="post-text">${fmtText(c.body)}</div></div></div>`;
   }
