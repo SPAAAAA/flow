@@ -495,3 +495,31 @@ body.has-mbar .chat-fab{bottom:84px}
 .tab-count:empty{display:none}
 .thread-composer{background:var(--bg-2)}
 #tabbody .feed{background:transparent;border-radius:12px}
+
+/* ---------- levels & badges ---------- */
+.lvl{display:inline-flex;align-items:center;gap:3px;margin-left:4px;flex:none;vertical-align:middle}
+.lvl:empty{display:none}
+.lvl-badge{font-size:11px;line-height:1}
+.lvl-pill{display:inline-block;padding:1px 6px;border-radius:999px;font-size:9.5px;font-weight:800;letter-spacing:.04em;white-space:nowrap;background:var(--panel-3);color:var(--text-2);border:1px solid var(--border-2)}
+.lvl-pill.lv2{background:var(--accent-soft);color:var(--accent-2);border-color:rgba(61,139,255,.35)}
+.lvl-pill.lv3{background:rgba(157,92,255,.15);color:#b794ff;border-color:rgba(157,92,255,.4)}
+.lvl-pill.lv4{background:rgba(255,77,141,.14);color:#ff7aa8;border-color:rgba(255,77,141,.4)}
+.lvl-pill.lv5{background:linear-gradient(135deg,#ffe58a,#ffb800);color:#1a1300;border-color:transparent}
+.plevel{margin-top:8px}
+.plevel-row{display:flex;align-items:center;gap:10px}
+.plevel .lvl-pill{font-size:11px;padding:2px 9px}
+.xpbar{width:160px;height:6px;border-radius:999px;background:var(--panel-3);overflow:hidden}
+.xpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-3),var(--accent-2))}
+.badge-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.mbadge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:var(--panel-2);border:1px solid var(--border-2);font-size:12px;font-weight:600;color:var(--text-2)}
+
+/* ---------- call tracking ---------- */
+.call{margin-top:8px}
+.call:empty{display:none}
+.call-pill{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 12px;border-radius:10px;font-size:13px;border:1px solid var(--border);background:var(--panel-2)}
+.call-pill.up{border-color:rgba(61,139,255,.35);background:var(--accent-soft)}
+.call-pill.up b{color:var(--accent-2)}
+.call-pill.down{border-color:rgba(255,77,106,.3);background:var(--down-soft)}
+.call-pill.down b{color:var(--down)}
+.call-pill.neutral{color:var(--text-2)}
+.call-pill .muted{font-size:12px}
