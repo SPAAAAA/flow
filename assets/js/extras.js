@@ -133,7 +133,8 @@
     ctx.fillStyle = "#eceef4"; ctx.font = "800 40px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"; ctx.fillText("FLOW", 136, 94);
     if (o.tag) { ctx.font = "700 22px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"; const tw = ctx.measureText(o.tag).width + 36; rr(ctx, W - 64 - tw, 58, tw, 44, 22); ctx.fillStyle = "rgba(255,255,255,.08)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.14)"; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = "#b9bdcb"; ctx.fillText(o.tag, W - 64 - tw + 18, 88); }
     // coin
-    const [cim, uim] = await Promise.all([loadImg(o.coin?.image), loadImg(o.user?.avatar)]);
+    const viaProxy = (u) => (u && /^https?:/.test(u) ? `https://wsrv.nl/?url=${encodeURIComponent(u)}&w=256&h=256&fit=cover&output=png` : null);
+    const [cim, uim] = await Promise.all([loadImg(o.coin?.image).then((im) => im || loadImg(viaProxy(o.coin?.image))), loadImg(o.user?.avatar).then((im) => im || loadImg(viaProxy(o.user?.avatar)))]);
     circleImg(ctx, cim, 64, 150, 104, o.coin?.symbol, "#1c1f2a");
     ctx.fillStyle = "#eceef4"; fit(ctx, "$" + (o.coin?.symbol || ""), 700, 62); ctx.fillText("$" + (o.coin?.symbol || ""), 190, 208);
     ctx.fillStyle = "#7d8294"; ctx.font = "600 26px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"; ctx.fillText((o.coin?.name || "").slice(0, 40), 192, 244);
