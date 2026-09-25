@@ -172,7 +172,7 @@
     { id: "recruiter", ic: "🎟️", name: "Recruiter", why: "Invited a friend to FLOW", test: (s) => s.invites >= 1 },
     { id: "ambassador", ic: "📣", name: "Ambassador", why: "Invited 10+ friends to FLOW", test: (s) => s.invites >= 10 },
   ];
-  const xpOf = (s) => s.posts * 10 + s.likes * 3 + s.comments * 4 + s.trades * 8 + s.followers * 6 + (s.checkins || 0) * 5 + (s.invites || 0) * 25 + (s.wins || 0) * 100;
+  const xpOf = (s) => s.posts * 10 + s.likes * 3 + s.comments * 4 + s.trades * 8 + s.followers * 6 + (s.checkins || 0) * 5 + (s.invites || 0) * 100 + (s.wins || 0) * 100;
   const levelOf = (xp) => Math.min(99, Math.floor(Math.sqrt(xp / 40)) + 1);
   const xpFor = (lvl) => 40 * (lvl - 1) ** 2;
   F.levels = {

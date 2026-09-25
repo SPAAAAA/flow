@@ -162,7 +162,7 @@
     const link = F.inviteLink(F.auth.profile);
     const s = F.levels?.get(F.auth.profile.id);
     el.innerHTML = `<div class="invite-card"><div class="invite-ic">${F.icons.gift}</div>
-      <div style="flex:1;min-width:0"><b>Invite friends to ${F.esc(F.cfg.siteName)}</b><div class="muted" style="font-size:13px">+25 XP for every friend who joins with your link${s ? ` · <b style="color:var(--text)">${s.invites || 0}</b> joined so far` : ""}. Invite 1 for 🎟️ Recruiter, 10 for 📣 Ambassador.</div>
+      <div style="flex:1;min-width:0"><b>Invite friends to ${F.esc(F.cfg.siteName)}</b><div class="muted" style="font-size:13px">+100 XP for every friend who joins with your link${s ? ` · <b style="color:var(--text)">${s.invites || 0}</b> joined so far` : ""}. Invite 1 for 🎟️ Recruiter, 10 for 📣 Ambassador.</div>
         <div class="invite-link"><input readonly value="${F.esc(link)}" id="invlink"><button class="btn btn-primary btn-sm" id="invcopy">${F.icons.copy}Copy</button></div></div></div>`;
     F.$("#invcopy").onclick = () => F.copy(link, "Invite link copied");
     F.$("#invlink").onclick = (e) => e.target.select();
