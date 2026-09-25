@@ -29,9 +29,10 @@
           <div class="pbio" id="pbio"></div>
           <div class="follow-counts" id="pfollow"></div>
           <div class="plevel" id="plevel"></div>
+          <div class="pshow" id="pshow"></div>
         </div>
         <div class="actions">
-          <span id="pedit"></span><span id="pdm"></span>
+          <span id="pach"></span><span id="pedit"></span><span id="pdm"></span>
           <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
@@ -155,6 +156,29 @@
     if (sa) sa.onclick = () => { const best = rows.slice().sort((a, b2) => b2.total - a.total)[0]?.coin;
       F.openShare({ tag: "MY PNL", big: F.fmtSol(tot, 2), up: tot >= 0, line1: `${F.fmtPct(spent ? (tot / spent) * 100 : null)} across ${rows.length} coin${rows.length > 1 ? "s" : ""}`, line2: `Win rate ${closed.length ? Math.round((wins / closed.length) * 100) + "%" : "—"} · verified on-chain`,
         coin: { image: best?.image || member.avatar_url, symbol: "PNL", name: `${F.displayName(member).replace(/<[^>]+>/g, "")} on FLOW` }, user: F.shareUser(), url: location.href.split("#")[0], text: `My FLOW PnL: ${F.fmtSol(tot, 2)} 🌊` }); };
+  }
+
+  /* ---------- achievements button + showcase ---------- */
+  let achFor = null;
+  async function renderAch() {
+    const slot = F.$("#pach"), show = F.$("#pshow");
+    if (!slot || !F.achievements || !F.auth.enabled || !member) return;
+    if (achFor === member.id + (F.auth.profile?.id || "")) return;
+    achFor = member.id + (F.auth.profile?.id || "");
+    slot.innerHTML = `<button class="btn btn-ghost btn-sm ach-btn" id="achbtn">🏆 Achievements <span class="muted">…</span></button>`;
+    F.$("#achbtn").onclick = () => F.openAchievements(member);
+    try {
+      const list = F.achievements.evaluate(await F.achievements.statsFor(member.id));
+      const got = list.filter((a) => a.done);
+      F.$("#achbtn").innerHTML = `🏆 Achievements <span class="ach-count">${got.length}/${list.length}</span>`;
+      const ord = { u: 0, c: 1, r: 2, e: 3, l: 4 };
+      const top = got.sort((a, b) => ord[b.r] - ord[a.r]).slice(0, 7);
+      if (show) {
+        show.innerHTML = top.length ? top.map((a) => `<button class="pshow-t ${F.achievements.RAR[a.r].cls}" title="${F.esc(a.name)} · ${F.achievements.RAR[a.r].name}">${a.ic}</button>`).join("") : "";
+        show.onclick = () => F.openAchievements(member);
+      }
+      if (F.qs("ach") && !renderAch.opened) { renderAch.opened = true; F.openAchievements(member); }
+    } catch {}
   }
 
   /* ---------- PnL card: portfolio value, profit over time, rank ---------- */
@@ -382,7 +406,7 @@
       if (member?.tiktok_handle) links.push(`<a href="https://www.tiktok.com/@${encodeURIComponent(member.tiktok_handle)}" target="_blank" rel="noopener nofollow" class="plink">${F.icons.tiktok}@${F.esc(member.tiktok_handle)}</a>`);
       bio.innerHTML = `${member?.bio ? `<p class="pbio-text">${F.esc(member.bio)}</p>` : ""}${links.length ? `<div class="plinks">${links.join("")}</div>` : ""}`;
     }
-    renderFollow(); renderLevel().then(renderInvite); renderDmBtn(); renderPnlCard();
+    renderFollow(); renderLevel().then(renderInvite); renderDmBtn(); renderPnlCard(); renderAch();
     const ed = F.$("#pedit");
     if (!F.auth.enabled) ed.innerHTML = "";
     else if (me) { ed.innerHTML = `<button class="btn btn-primary btn-sm" id="edit-btn">${F.icons.edit}Edit profile</button>`; F.$("#edit-btn").onclick = openEdit; }
