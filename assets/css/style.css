@@ -528,3 +528,90 @@ body.has-mbar .chat-fab{bottom:84px}
 .chat .msg-top .lvl-badge{display:none}
 .chat .msg-top .founder{flex-shrink:0}
 .chat .msg-top .msg-time{flex-shrink:0}
+
+/* ---------- profile banner / bio / links ---------- */
+.pbanner{height:0;border-radius:16px;margin-bottom:0;background:var(--panel-2) center/cover no-repeat;transition:height .2s}
+.pbanner.has{height:180px;margin-bottom:-36px;border:1px solid var(--border)}
+.pbanner.has + .profile-head{position:relative;padding-left:16px}
+.pbanner.has + .profile-head .avatar{border:4px solid var(--bg)}
+.pbio-text{margin:6px 0 0;color:var(--text-2);max-width:560px;white-space:pre-wrap}
+.plinks{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:13px;align-items:center}
+.plink{display:inline-flex;align-items:center;gap:5px;color:var(--accent-2)}
+.plink svg{width:13px;height:13px}
+.plink:hover{text-decoration:underline}
+.edit-banner{display:flex;align-items:flex-end;justify-content:flex-end;height:90px;border-radius:12px;margin:-6px 0 14px;background:var(--panel-2) center/cover no-repeat;border:1px dashed var(--border-2);cursor:pointer;padding:8px}
+.edit-banner span{display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.edit-banner span svg{width:13px;height:13px}
+.streak-pill{font-size:12px;font-weight:700;color:var(--warn);background:rgba(255,181,71,.12);border:1px solid rgba(255,181,71,.3);padding:2px 9px;border-radius:999px;white-space:nowrap}
+@media (max-width:860px){ .pbanner.has{height:120px} }
+
+/* ---------- mentions / tickers ---------- */
+.mention{color:var(--accent-2);font-weight:600}
+.mention:hover,a.msg-tk:hover{text-decoration:underline}
+
+/* ---------- polls ---------- */
+.poll:empty{display:none}
+.poll-box{margin-top:10px;display:flex;flex-direction:column;gap:6px;max-width:460px}
+.poll-opt{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--border-2);background:var(--bg-2);font-size:14px;font-weight:600;overflow:hidden;text-align:left;color:var(--text)}
+button.poll-opt:hover{border-color:var(--accent);color:var(--accent-2)}
+.poll-opt.res i{position:absolute;inset:0 auto 0 0;background:var(--panel-3);border-radius:10px 0 0 10px}
+.poll-opt.res.mine i{background:rgba(61,139,255,.28)}
+.poll-opt.res.win{border-color:rgba(61,139,255,.5)}
+.poll-opt span,.poll-opt b{position:relative}
+.poll-meta{font-size:12px;color:var(--muted)}
+.poll-builder{display:flex;flex-direction:column;gap:6px;margin:4px 0 10px}
+.poll-builder .input{height:38px}
+.pb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pb-row .select{height:34px}
+.pb-toggle{font-size:13px;font-weight:600;color:var(--accent-2);padding:4px 8px;border-radius:8px}
+.pb-toggle:hover{background:var(--accent-soft)}
+
+/* ---------- messages ---------- */
+.nav a{position:relative}
+.nav-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:inline-grid;place-items:center}
+.dm-wrap{display:grid;grid-template-columns:300px minmax(0,1fr);height:calc(100vh - var(--topbar) - 110px);min-height:420px;background:var(--panel);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.dm-list{border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.dm-list-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel)}
+.dm-thread{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.dm-thread:hover{background:var(--panel-2)}
+.dm-thread.active{background:var(--accent-soft)}
+.dm-thread img{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none}
+.dm-t-main{min-width:0;flex:1}
+.dm-t-top{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}
+.dm-t-top .muted{font-size:11.5px;flex:none}
+.dm-t-last{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dm-t-last.unread{color:var(--text);font-weight:600}
+.dm-conv{display:flex;flex-direction:column;min-width:0}
+.dm-empty{margin:auto;text-align:center;padding:24px;max-width:320px}
+.dm-empty b{display:block;font-size:16px;margin:6px 0}
+.dm-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.dm-back{display:none}
+.dm-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:6px}
+.dm-msg{display:flex;align-items:flex-end;gap:6px;max-width:75%}
+.dm-msg.mine{align-self:flex-end;flex-direction:row-reverse}
+.dm-bubble{padding:8px 12px;border-radius:16px 16px 16px 4px;background:var(--panel-3);font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.dm-msg.mine .dm-bubble{background:var(--accent);color:#fff;border-radius:16px 16px 4px 16px}
+.dm-time{font-size:10.5px;color:var(--muted);flex:none}
+.dm-form{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border)}
+.dm-form input{flex:1;min-width:0;height:40px;border-radius:999px;border:1px solid var(--border);background:var(--bg-2);padding:0 16px;outline:none}
+.dm-form input:focus{border-color:var(--accent)}
+.dm-form .btn{width:40px;height:40px;padding:0;border-radius:50%}
+.dm-locked{padding:14px;border-top:1px solid var(--border);color:var(--text-2);font-size:13px;display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+@media (max-width:760px){
+  .dm-wrap{grid-template-columns:1fr;height:calc(100vh - var(--topbar) - 90px)}
+  .dm-conv{display:none}
+  .dm-conv.open{display:flex;position:fixed;inset:var(--topbar) 0 0 0;z-index:40;background:var(--panel)}
+  .dm-back{display:grid}
+}
+
+/* ---------- trending on FLOW ---------- */
+.flow-trend{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:24px;scrollbar-width:thin}
+.ft-card{flex:0 0 230px;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--panel);border:1px solid var(--border);position:relative}
+.ft-card:hover{border-color:var(--accent)}
+.ft-rank{position:absolute;top:6px;left:8px;font-size:10px;font-weight:800;color:var(--muted)}
+.ft-card img{width:40px;height:40px;border-radius:10px;object-fit:cover;flex:none;background:var(--panel-3)}
+.ft-main{min-width:0}
+.ft-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ft-name .muted{font-weight:500;font-size:12px}
+.ft-meta{font-size:12px;color:var(--text-2);white-space:nowrap}
+.ft-chg{margin-left:4px}
