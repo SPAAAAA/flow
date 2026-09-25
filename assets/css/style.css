@@ -523,3 +523,8 @@ body.has-mbar .chat-fab{bottom:84px}
 .call-pill.down b{color:var(--down)}
 .call-pill.neutral{color:var(--text-2)}
 .call-pill .muted{font-size:12px}
+/* chat: keep names readable next to badges */
+.chat .msg-top .msg-name{flex-shrink:0;max-width:120px}
+.chat .msg-top .lvl-badge{display:none}
+.chat .msg-top .founder{flex-shrink:0}
+.chat .msg-top .msg-time{flex-shrink:0}
