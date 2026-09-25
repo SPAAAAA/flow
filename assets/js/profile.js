@@ -32,7 +32,7 @@
           <div class="pshow" id="pshow"></div>
         </div>
         <div class="actions">
-          <span id="pach"></span><span id="pedit"></span><span id="pdm"></span>
+          <span id="phide"></span><span id="pach"></span><span id="pedit"></span><span id="pdm"></span>
           <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
@@ -103,7 +103,7 @@
       ${list.length ? `<div class="table-wrap" style="border:0;background:none"><table class="t" style="min-width:600px"><thead><tr><th>Coin</th><th class="num">Amount</th><th class="num">Price</th><th class="num">24h</th><th class="num">Value</th><th></th></tr></thead><tbody>
       ${list.map((h) => { const c = h.coin; return `<tr data-href="coin.html?c=${h.mint}" style="cursor:pointer">
         <td><div class="coin-cell"><img src="${F.img(c?.image, h.mint)}" alt="${F.esc(c?.symbol || "")}"><div><div class="n">${F.esc(c?.name || F.short(h.mint, 6))}</div><div class="s">${c ? "$" + F.esc(c.symbol) : "Unknown token"}</div></div></div></td>
-        <td class="num">${F.num(h.amount)}</td><td class="num">${F.price(c?.priceUsd)}</td><td class="num">${F.pct(c?.chg?.h24)}</td><td class="num"><b>${F.usd(h.value)}</b></td>
+        <td class="num sens">${F.num(h.amount)}</td><td class="num">${F.price(c?.priceUsd)}</td><td class="num">${F.pct(c?.chg?.h24)}</td><td class="num sens"><b>${F.usd(h.value)}</b></td>
         <td class="num"><a class="btn btn-ghost btn-sm" href="coin.html?c=${h.mint}">Trade</a></td></tr>`; }).join("")}
       </tbody></table></div>` : `<div class="empty-state"><b>No coins yet</b>${S.hideDust && S.holdings.length ? "Only small balances — switch off “Hide small balances” to see them." : "This wallet doesn't hold any tokens."}</div>`}`;
     F.$("#dust").onchange = (e) => { S.hideDust = e.target.checked; F.store.set("hideDust", S.hideDust); renderCoins(); };
@@ -130,7 +130,7 @@
     const closed = rows.filter((r) => r.st > 0), wins = closed.filter((r) => r.realized > 0).length;
     const usd = (v) => (sol ? `<span class="muted" style="font-size:12px">${v < 0 ? "−" : ""}${F.usd(Math.abs(v * sol))}</span>` : "");
     const cls = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
-    b.innerHTML = `<div class="kpis" style="margin-bottom:14px">
+    b.innerHTML = `<div class="pnl-tab"><div class="kpis" style="margin-bottom:14px">
         <div class="stat"><div class="l">Total PnL</div><div class="v ${cls(tot)}">${F.fmtSol(tot)} ${usd(tot)}</div></div>
         <div class="stat"><div class="l">Realized</div><div class="v ${cls(real)}">${F.fmtSol(real)}</div></div>
         <div class="stat"><div class="l">Unrealized</div><div class="v ${cls(unr)}">${F.fmtSol(unr)}</div></div>
@@ -145,7 +145,7 @@
         <td class="num"><b class="${cls(r.total)}">${F.fmtSol(r.total)}</b><div class="${cls(r.total)}" style="font-size:12px">${F.fmtPct(r.pct)}</div></td>
         <td class="num">${me ? `<button class="btn btn-ghost btn-sm" data-pshare="${i}" title="Share">${F.icons.share}</button>` : ""}</td></tr>`; }).join("")}
       </tbody></table></div>
-      <p class="note">Only trades made on ${F.esc(F.cfg.siteName)} count, and each one is checked on the Solana blockchain. Unrealized PnL uses today's price.</p>`;
+      <p class="note">Only trades made on ${F.esc(F.cfg.siteName)} count, and each one is checked on the Solana blockchain. Unrealized PnL uses today's price.</p></div>`;
     b.onclick = (e) => {
       const s = e.target.closest("[data-pshare]");
       if (s) { e.stopPropagation(); const r = rows[Number(s.dataset.pshare)]; const c = r.coin || {};
@@ -391,6 +391,9 @@
   function renderIdentity() {
     if (!F.$("#pname")) return;
     const me = F.auth.isMe?.(addr), connectedHere = F.wallet.pubkey === addr;
+    document.body.classList.toggle("own-profile", !!(me || connectedHere));
+    const hb = F.$("#phide");
+    if (hb) hb.innerHTML = me || connectedHere ? F.hideBalBtn() : "";
     F.$("#pname").innerHTML = `${member?.name ? F.esc(member.name) : F.short(addr, 6)} ${F.founderBadge(addr)} ${me || connectedHere ? '<span class="badge blue">You</span>' : ""}${member?.banned ? ' <span class="badge suspended" title="This account was suspended for breaking the rules">Suspended</span>' : ""}`;
     F.$("#pav").src = member?.avatar_url || F.avatar(addr);
     F.$("#psince").textContent = member ? `Member since ${new Date(member.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : "";

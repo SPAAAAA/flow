@@ -336,6 +336,29 @@
     if (data) { p.referred_by = true; F.toast("Welcome to FLOW 🌊", "You joined through a friend's invite — they get a thank-you badge."); }
   }
 
+  /* ================= streamer mode: hide balances ================= */
+  const eyeOn = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const eyeOff = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.9 0 3.5-.6 4.9-1.4M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`;
+  F.hideBal = !!F.store.get("hideBal", false);
+  const applyHide = () => {
+    document.documentElement.classList.toggle("hidebal", F.hideBal);
+    F.$$("[data-hidebal]").forEach((b) => { b.innerHTML = F.hideBalInner(); b.classList.toggle("on", F.hideBal); b.title = F.hideBal ? "Show balances" : "Hide balances (streamer mode)"; });
+  };
+  F.hideBalInner = () => (F.hideBal ? `${eyeOff}<span>Balances hidden</span>` : `${eyeOn}<span>Hide balances</span>`);
+  F.hideBalBtn = () => `<button class="btn btn-ghost btn-sm hb-btn ${F.hideBal ? "on" : ""}" data-hidebal title="${F.hideBal ? "Show balances" : "Hide balances (streamer mode)"}">${F.hideBalInner()}</button>`;
+  F.toggleHideBal = () => { F.hideBal = !F.hideBal; F.store.set("hideBal", F.hideBal); applyHide(); F.toast(F.hideBal ? "Balances hidden 🙈" : "Balances visible", F.hideBal ? "Streamer mode is on — your numbers are covered on your profile, wallet button and trade panel." : ""); };
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-hidebal]")) { e.preventDefault(); F.toggleHideBal(); } });
+  applyHide();
+  // small eye next to the wallet button on every page
+  function eyeInTopbar() {
+    const chip = F.$("#wchip");
+    if (!chip || F.$("#hb-top")) return;
+    const b = F.h(`<button class="icon-btn hb-top" id="hb-top" data-hidebal title="Hide balances (streamer mode)"></button>`);
+    chip.parentElement.insertBefore(b, chip);
+    applyHide();
+  }
+  new MutationObserver(() => eyeInTopbar()).observe(document.body, { childList: true, subtree: true });
+
   /* ================= boot ================= */
   let lastId = undefined;
   function onAuth() {
