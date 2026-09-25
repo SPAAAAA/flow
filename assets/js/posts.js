@@ -2,7 +2,7 @@
    Used by post.html (full feed) and profile.html (a member's posts). */
 (function () {
   const F = FLOW;
-  const SEL = "id,body,like_count,comment_count,created_at,user_id,profiles(id,wallet,name,avatar_url)";
+  const SEL = "id,body,like_count,comment_count,created_at,user_id,profiles!posts_user_id_fkey(id,wallet,name,avatar_url)";
   const liked = new Set();       // post ids the signed-in member liked
   const byId = new Map();        // post id -> post
   const openComments = new Set();
@@ -120,7 +120,7 @@
     if (!open) { openComments.delete(id); return; }
     openComments.add(id);
     box.innerHTML = `<div class="muted" style="font-size:13px;padding:6px 0">Loading comments…</div>`;
-    const { data, error } = await F.sb.from("post_comments").select("id,post_id,body,created_at,user_id,profiles(id,wallet,name,avatar_url)").eq("post_id", id).order("created_at", { ascending: true }).limit(200);
+    const { data, error } = await F.sb.from("post_comments").select("id,post_id,body,created_at,user_id,profiles!post_comments_user_id_fkey(id,wallet,name,avatar_url)").eq("post_id", id).order("created_at", { ascending: true }).limit(200);
     if (error) { box.innerHTML = `<div class="muted">Couldn't load comments.</div>`; return; }
     box.innerHTML = `<div class="cmt-list">${data.map(commentHtml).join("") || '<div class="muted cmt-empty" style="font-size:13px;padding:4px 0">No comments yet.</div>'}</div>
       ${me() ? `<form class="cmt-form" data-cform="${id}"><img src="${F.avatarOf(me())}" alt=""><input maxlength="300" placeholder="Write a comment…" autocomplete="off"><button class="btn btn-primary btn-sm">Reply</button></form>`
