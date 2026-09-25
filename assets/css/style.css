@@ -833,14 +833,14 @@ button.poll-opt:hover{border-color:var(--accent);color:var(--accent-2)}
 .hidebal body.own-profile .pnl-tab td.num,
 .hidebal body.own-profile .pc-big,
 .hidebal body.own-profile .pc-profit,
-.hidebal body.own-profile .pc-sol b,
+.hidebal body.own-profile .pc-sol,
 .hidebal body.own-profile .pc-v{position:relative;color:transparent!important;text-shadow:none!important;user-select:none}
 .hidebal #wbal *,.hidebal #balVal *,.hidebal #pos b *,.hidebal #pospnl b *,
 .hidebal body.own-profile #kpis .v *,.hidebal body.own-profile .sens *,.hidebal body.own-profile .pnl-tab .v *,.hidebal body.own-profile .pnl-tab td.num *,
-.hidebal body.own-profile .pc-big *,.hidebal body.own-profile .pc-profit *,.hidebal body.own-profile .pc-sol b *,.hidebal body.own-profile .pc-v *{visibility:hidden}
+.hidebal body.own-profile .pc-big *,.hidebal body.own-profile .pc-profit *,.hidebal body.own-profile .pc-sol *,.hidebal body.own-profile .pc-v *{visibility:hidden}
 .hidebal #wbal::after,.hidebal #balVal::after,.hidebal #pos b::after,.hidebal #pospnl b::after,
 .hidebal body.own-profile #kpis .v::after,.hidebal body.own-profile .sens::after,.hidebal body.own-profile .pnl-tab .v::after,.hidebal body.own-profile .pnl-tab td.num::after,
-.hidebal body.own-profile .pc-big::after,.hidebal body.own-profile .pc-profit::after,.hidebal body.own-profile .pc-sol b::after,.hidebal body.own-profile .pc-v::after{
+.hidebal body.own-profile .pc-big::after,.hidebal body.own-profile .pc-profit::after,.hidebal body.own-profile .pc-sol::after,.hidebal body.own-profile .pc-v::after{
   content:"••••••";position:absolute;inset:0;display:flex;align-items:center;color:var(--muted);letter-spacing:3px;visibility:visible;font-weight:700}
 .hidebal #pos b::after,.hidebal #pospnl b::after,.hidebal #balVal::after,.hidebal body.own-profile td.num::after,.hidebal body.own-profile .sens::after{justify-content:flex-end}
 .hidebal #wbal{min-width:54px;display:inline-block}
@@ -848,3 +848,7 @@ button.poll-opt:hover{border-color:var(--accent);color:var(--accent-2)}
 .hidebal body.own-profile .pc-chart{filter:blur(12px);pointer-events:none}
 .hidebal body.own-profile .pc-tip,.hidebal body.own-profile .pc-rank{visibility:hidden}
 .hidebal body.own-profile .pnl-tab [data-pshare],.hidebal body.own-profile #pnl-share-all,.hidebal body.own-profile #pc-share,.hidebal #pnlshare{display:none}
+
+#wallet-slot{display:flex;align-items:center}
+.hidebal body.own-profile .pc-sol{min-width:150px;min-height:40px}
+.hidebal body.own-profile .pc-sol::after{justify-content:center}
