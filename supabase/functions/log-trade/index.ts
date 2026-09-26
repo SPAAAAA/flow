@@ -37,9 +37,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   try {
-    const { signature, mint, symbol } = await req.json();
+    const { signature, mint, symbol, kind, to } = await req.json();
+    const isTip = kind === "tip";
     if (typeof signature !== "string" || !B58.test(signature) || signature.length < 64 || signature.length > 90) return json({ error: "bad signature" }, 400);
-    if (typeof mint !== "string" || !B58.test(mint) || mint.length < 32 || mint.length > 44) return json({ error: "bad mint" }, 400);
+    if (isTip) { if (typeof to !== "string" || !B58.test(to) || to.length < 32 || to.length > 44) return json({ error: "bad recipient" }, 400); }
+    else if (typeof mint !== "string" || !B58.test(mint) || mint.length < 32 || mint.length > 44) return json({ error: "bad mint" }, 400);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey(), { auth: { persistSession: false } });
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
@@ -48,8 +50,13 @@ Deno.serve(async (req) => {
     const { data: prof } = await admin.from("profiles").select("id,wallet").eq("id", u.user.id).single();
     if (!prof) return json({ error: "no profile" }, 400);
 
-    const { data: dup } = await admin.from("trades").select("id,side,sol_amount,tokens").eq("signature", signature).maybeSingle();
-    if (dup) return json({ ok: true, trade: dup, duplicate: true });
+    if (isTip) {
+      const { data: dupT } = await admin.from("tips").select("id,lamports").eq("signature", signature).maybeSingle();
+      if (dupT) return json({ ok: true, tip: dupT, duplicate: true });
+    } else {
+      const { data: dup } = await admin.from("trades").select("id,side,sol_amount,tokens").eq("signature", signature).maybeSingle();
+      if (dup) return json({ ok: true, trade: dup, duplicate: true });
+    }
 
     const tx = await getTx(signature);
     if (!tx) return json({ error: "transaction not found yet" }, 404);
@@ -58,6 +65,21 @@ Deno.serve(async (req) => {
 
     const keys: string[] = tx.transaction.message.accountKeys.map((k: any) => (typeof k === "string" ? k : k.pubkey));
     if (keys[0] !== prof.wallet) return json({ error: "this transaction was not made by your wallet" }, 403);
+
+    // ---- SOL tip: sum System Program transfers from the member's wallet to the recipient ----
+    if (isTip) {
+      const ixs: any[] = [...(tx.transaction.message.instructions || []), ...((tx.meta.innerInstructions || []).flatMap((x: any) => x.instructions || []))];
+      const lamports = ixs.filter((ix) => ix.program === "system" && ix.parsed?.type === "transfer" && ix.parsed.info?.source === prof.wallet && ix.parsed.info?.destination === to)
+        .reduce((a, ix) => a + Number(ix.parsed.info.lamports || 0), 0);
+      if (!lamports) return json({ error: "no SOL transfer to that wallet in this transaction" }, 400);
+      const { data: rp } = await admin.from("profiles").select("id").eq("wallet", to).maybeSingle();
+      const { data: tip, error: te } = await admin.from("tips").insert({
+        sender_id: prof.id, recipient_wallet: to, recipient_id: rp?.id || null, lamports, signature,
+        created_at: tx.blockTime ? new Date(tx.blockTime * 1000).toISOString() : new Date().toISOString(),
+      }).select("id,lamports").single();
+      if (te) return json({ error: te.code === "23505" ? "already recorded" : te.message }, te.code === "23505" ? 200 : 500);
+      return json({ ok: true, tip });
+    }
 
     const mine = (arr: any[] | undefined) => (arr || []).filter((b) => b.mint === mint && b.owner === prof.wallet);
     const sum = (arr: any[]) => arr.reduce((s, b) => s + Number(b.uiTokenAmount?.uiAmountString || 0), 0);
