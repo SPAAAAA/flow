@@ -1,6 +1,6 @@
 -- =========================================================
 -- FLOW achievements: one call returns every counter the achievements need.
--- Run after social4.sql. Safe to re-run. Read-only.
+-- Run after social5.sql. Safe to re-run. Read-only.
 -- =========================================================
 create or replace function public.achievement_stats(uid uuid) returns json
 language sql stable security definer set search_path = public as $$
@@ -36,7 +36,19 @@ language sql stable security definer set search_path = public as $$
     'wins',        (select count(*) from public.week_winners w where w.user_id = p.id),
     'invites',     (select count(*) from public.profiles r where r.referred_by = p.id),
     'reports',     (select count(*) from public.reports r where r.reporter_id = p.id),
-    'alerts',      (select count(*) from public.price_alerts a where a.user_id = p.id)
+    'alerts',      (select count(*) from public.price_alerts a where a.user_id = p.id),
+    'tips_sent_n',   (select count(*) from public.tips t where t.sender_id = p.id),
+    'tips_sent_sol', (select coalesce(sum(t.lamports), 0) / 1e9 from public.tips t where t.sender_id = p.id),
+    'tips_recv_n',   (select count(*) from public.tips t where t.recipient_wallet = p.wallet),
+    'tips_recv_sol', (select coalesce(sum(t.lamports), 0) / 1e9 from public.tips t where t.recipient_wallet = p.wallet),
+    'supporters',    (select count(distinct t.sender_id) from public.tips t where t.recipient_wallet = p.wallet),
+    'room_msgs',     (select count(*) from public.coin_chat c where c.user_id = p.id),
+    'room_coins',    (select count(distinct c.mint) from public.coin_chat c where c.user_id = p.id),
+    'seasons',       (select count(*) from public.season_rewards r where r.user_id = p.id),
+    'season_top3',   (select count(*) from public.season_rewards r where r.user_id = p.id and r.place <= 3),
+    'season_now',    coalesce((select b.points from public.season_board(null, 1000) b where b.user_id = p.id), 0),
+    'best_rank',     (select coalesce(max(case r.rank when 'silver' then 1 when 'gold' then 2 when 'diamond' then 3 when 'legend' then 4 else 0 end), 0) from public.season_rewards r where r.user_id = p.id),
+    'cosmetics',     (p.cos_frame is not null)::int + (p.cos_name is not null)::int + (p.cos_fx is not null)::int
   )
   from public.profiles p where p.id = uid;
 $$;
