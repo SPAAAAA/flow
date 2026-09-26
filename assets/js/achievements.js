@@ -13,6 +13,7 @@
   };
   const ORDER = { u: 0, c: 1, r: 2, e: 3, l: 4 };
   const n = (v) => Number(v || 0);
+  const bestRank = (s) => { const p = n(s.season_now); const now = p >= 5000 ? 4 : p >= 2000 ? 3 : p >= 750 ? 2 : p >= 250 ? 1 : 0; return Math.max(now, n(s.best_rank)); };
   const b = (v) => (v ? 1 : 0);
 
   // cur(s) -> current value, goal -> target, unit -> "trades" etc.
@@ -88,6 +89,36 @@
     { cat: "Streaks", id: "d100", ic: "🎖️", name: "Veteran", r: "r", desc: "Visit on 100 different days", cur: (s) => n(s.checkins), goal: 100, unit: "days" },
     { cat: "Streaks", id: "d365", ic: "🪖", name: "Year in the Trenches", r: "l", desc: "Visit on 365 different days", cur: (s) => n(s.checkins), goal: 365, unit: "days" },
 
+    // ---------- Tips ----------
+    { cat: "Tips", id: "tip1", ic: "💝", name: "Generous", r: "c", desc: "Send SOL to another member", cur: (s) => n(s.tips_sent_n), goal: 1, unit: "tip" },
+    { cat: "Tips", id: "tip1sol", ic: "🎩", name: "Patron", r: "r", desc: "Send 1 SOL in tips in total", cur: (s) => n(s.tips_sent_sol), goal: 1, unit: "SOL sent" },
+    { cat: "Tips", id: "tip10sol", ic: "🏛️", name: "Philanthropist", r: "e", desc: "Send 10 SOL in tips in total", cur: (s) => n(s.tips_sent_sol), goal: 10, unit: "SOL sent" },
+    { cat: "Tips", id: "tipped", ic: "🪙", name: "Tipped", r: "c", desc: "Receive your first tip", cur: (s) => n(s.tips_recv_n), goal: 1, unit: "tip" },
+    { cat: "Tips", id: "fans5", ic: "🌹", name: "Fan Favourite", r: "r", desc: "Get tips from 5 different members", cur: (s) => n(s.supporters), goal: 5, unit: "supporters" },
+    { cat: "Tips", id: "stack", ic: "📺", name: "Streamer Stack", r: "l", desc: "Receive 10 SOL in tips in total", cur: (s) => n(s.tips_recv_sol), goal: 10, unit: "SOL received" },
+
+    // ---------- Live rooms ----------
+    { cat: "Live rooms", id: "room1", ic: "🎤", name: "Room Rookie", r: "u", desc: "Send a message in a live coin room", cur: (s) => n(s.room_msgs), goal: 1, unit: "message" },
+    { cat: "Live rooms", id: "room100", ic: "📻", name: "On Air", r: "r", desc: "Send 100 messages in live rooms", cur: (s) => n(s.room_msgs), goal: 100, unit: "messages" },
+    { cat: "Live rooms", id: "room1000", ic: "🎧", name: "Voice of the Trenches", r: "e", desc: "Send 1,000 messages in live rooms", cur: (s) => n(s.room_msgs), goal: 1000, unit: "messages" },
+    { cat: "Live rooms", id: "rooms10", ic: "🗺️", name: "Globetrotter", r: "r", desc: "Chat in 10 different coin rooms", cur: (s) => n(s.room_coins), goal: 10, unit: "rooms" },
+
+    // ---------- Seasons ----------
+    { cat: "Seasons", id: "rk1", ic: "🥈", name: "Silver Lining", r: "c", desc: "Reach Silver in a season", cur: (s) => b(bestRank(s) >= 1), goal: 1 },
+    { cat: "Seasons", id: "rk2", ic: "🥇", name: "Golden Season", r: "r", desc: "Reach Gold in a season", cur: (s) => b(bestRank(s) >= 2), goal: 1 },
+    { cat: "Seasons", id: "rk3", ic: "💎", name: "Diamond Season", r: "e", desc: "Reach Diamond in a season", cur: (s) => b(bestRank(s) >= 3), goal: 1 },
+    { cat: "Seasons", id: "rk4", ic: "🔱", name: "Season Legend", r: "l", desc: "Reach FLOW Legend in a season", cur: (s) => b(bestRank(s) >= 4), goal: 1 },
+    { cat: "Seasons", id: "podium", ic: "🏅", name: "Podium Finish", r: "e", desc: "Finish a season in the top 3", cur: (s) => n(s.season_top3), goal: 1, unit: "top-3 finish" },
+    { cat: "Seasons", id: "seasons3", ic: "📆", name: "Season Veteran", r: "r", desc: "Finish 3 seasons", cur: (s) => n(s.seasons), goal: 3, unit: "seasons" },
+    { cat: "Seasons", id: "pts1000", ic: "⚡", name: "Point Machine", r: "r", desc: "Earn 1,000 points in one season", cur: (s) => n(s.season_now), goal: 1000, unit: "points this season" },
+
+    // ---------- Style ----------
+    { cat: "Style", id: "dressed", ic: "👔", name: "Dressed Up", r: "u", desc: "Equip a frame, name colour or banner effect", cur: (s) => n(s.cosmetics), goal: 1, unit: "cosmetic" },
+    { cat: "Style", id: "drip", ic: "💅", name: "Full Drip", r: "r", desc: "Wear a frame, name colour and banner effect at once", cur: (s) => n(s.cosmetics), goal: 3, unit: "cosmetics" },
+    { cat: "Style", id: "collector_c", ic: "🧥", name: "Wardrobe", r: "e", desc: "Unlock 10 cosmetics", cur: (s) => n(s._cos_unlocked), goal: 10, unit: "cosmetics unlocked" },
+    { cat: "Style", id: "collector_all", ic: "👑", name: "Trendsetter", r: "l", desc: "Unlock every cosmetic", cur: (s) => n(s._cos_unlocked), goal: 16, unit: "cosmetics unlocked" },
+    { cat: "Style", id: "invite_style", ic: "🪞", name: "Mirror Mirror", r: "c", desc: "Upload a picture and pick a name colour", cur: (s) => b(s.has_avatar) + b(s.cosmetics > 0), goal: 2, unit: "steps" },
+
     // ---------- Competitions & growth ----------
     { cat: "Legacy", id: "early", ic: "🌊", name: "Early Member", r: "e", desc: "One of the first 10,000 members", cur: (s) => b(n(s.join_rank) > 0 && n(s.join_rank) <= 10000), goal: 1, noProgress: true },
     { cat: "Legacy", id: "og", ic: "🦖", name: "OG", r: "l", desc: "One of the first 1,000 members", cur: (s) => b(n(s.join_rank) > 0 && n(s.join_rank) <= 1000), goal: 1, noProgress: true },
@@ -124,6 +155,12 @@
     return s;
   }
   function evaluate(s) {
+    if (F.COS && s._cos_unlocked == null) {
+      // cosmetics unlock from achievement counts — count them from the non-Style achievements
+      const base = LIST.filter((a) => a.cat !== "Style").map((a) => ({ r: a.r, done: Math.max(0, a.cur(s) || 0) >= a.goal }));
+      const c = { all: 0, u: 0, c: 0, r: 0, e: 0, l: 0 }; base.filter((a) => a.done).forEach((a) => { c.all++; c[a.r]++; });
+      s._cos_unlocked = Object.values(F.COS).flat().filter((x) => x.id !== "founder" && x.t(c, "")).length;
+    }
     return LIST.map((a) => {
       const cur = Math.max(0, a.cur(s) || 0);
       return { ...a, cur, done: cur >= a.goal, frac: Math.min(1, cur / a.goal) };
