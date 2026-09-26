@@ -393,7 +393,11 @@
         const W = window.solanaWeb3;
         const from = new W.PublicKey(F.wallet.pubkey), dest = new W.PublicKey(to.wallet);
         const { value } = await F.rpc("getLatestBlockhash", [{ commitment: "confirmed" }]);
-        const msg = new W.TransactionMessage({ payerKey: from, recentBlockhash: value.blockhash, instructions: [W.SystemProgram.transfer({ fromPubkey: from, toPubkey: dest, lamports: Math.round(v * 1e9) })] }).compileToV0Message();
+        // System Program transfer: [u32 index=2][u64 lamports], built by hand (the browser build has no Buffer)
+        const data = new Uint8Array(12), dv = new DataView(data.buffer);
+        dv.setUint32(0, 2, true); dv.setBigUint64(4, BigInt(Math.round(v * 1e9)), true);
+        const ix = new W.TransactionInstruction({ programId: W.SystemProgram.programId, keys: [{ pubkey: from, isSigner: true, isWritable: true }, { pubkey: dest, isSigner: false, isWritable: true }], data });
+        const msg = new W.TransactionMessage({ payerKey: from, recentBlockhash: value.blockhash, instructions: [ix] }).compileToV0Message();
         const bytes = new W.VersionedTransaction(msg).serialize();
         let bin = ""; bytes.forEach((x) => (bin += String.fromCharCode(x)));
         go.textContent = "Confirm in your wallet…";
