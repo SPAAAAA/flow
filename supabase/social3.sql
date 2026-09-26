@@ -21,9 +21,12 @@ create or replace function public.notify_mentions() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare h text; target uuid; pid bigint; n int := 0;
 begin
-  pid := case when tg_table_name = 'posts' then new.id else new.post_id end;
+  -- read the post id without touching a column the other table doesn't have
+  if tg_table_name = 'posts' then pid := (to_jsonb(new) ->> 'id')::bigint;
+  else pid := (to_jsonb(new) ->> 'post_id')::bigint; end if;
   for h in select distinct lower(m[1]) from regexp_matches(new.body, '@([A-Za-z0-9_.\-]{2,20})', 'g') as m loop
     exit when n >= 10;
+    target := null;
     select id into target from public.profiles where lower(replace(name, ' ', '_')) = h limit 1;
     if target is not null and target <> new.user_id then
       insert into public.notifications (user_id, actor_id, type, post_id) values (target, new.user_id, 'mention', pid);
