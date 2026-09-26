@@ -336,6 +336,81 @@
     if (data) { p.referred_by = true; F.toast("Welcome to FLOW 🌊", "You joined through a friend's invite — they get a thank-you badge."); }
   }
 
+  /* ================= send SOL to another member ================= */
+  function loadWeb3() {
+    if (window.solanaWeb3) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.0/lib/index.iife.min.js";
+      s.onload = () => res(); s.onerror = () => rej(new Error("Couldn't load the Solana library — check your connection"));
+      document.head.appendChild(s);
+    });
+  }
+  F.sendSolModal = async (to) => {
+    if (!to?.wallet || !F.isAddress(to.wallet)) return;
+    if (F.wallet.pubkey === to.wallet) return F.toast("That's your own wallet", "", "warn");
+    const name = to.name ? F.esc(to.name) : F.short(to.wallet);
+    const m = F.h(`<div class="modal-bg"><div class="modal" style="max-width:420px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Send SOL</h3><button class="icon-btn" data-x>${F.icons.close}</button></div>
+      <div class="tip-to"><img src="${F.esc(to.avatar_url || F.avatar(to.wallet))}" alt=""><div style="min-width:0"><b>${name}</b>${F.founderBadge(to.wallet, true)}<div class="mono muted tip-addr" title="${F.esc(to.wallet)}">${F.esc(to.wallet)}</div></div></div>
+      <div class="field tip-field"><input id="tip-amt" inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="unit">SOL</span></div>
+      <div class="tip-usd muted" id="tip-usd">&nbsp;</div>
+      <div class="al-chips">${[0.01, 0.05, 0.1, 0.25, 0.5, 1].map((v) => `<button class="chip" data-tv="${v}">${v} SOL</button>`).join("")}</div>
+      <div class="trade-row"><span>Your balance</span><b id="tip-bal">${F.wallet.connected ? "…" : "—"}</b></div>
+      <div class="trade-row"><span>Network fee</span><b>≈ 0.000005 SOL</b></div>
+      <label class="report-opt hidden" id="tip-big" style="margin-top:8px"><input type="checkbox" id="tip-ok"><span>Yes, send this much. Solana transfers can't be undone.</span></label>
+      <button class="btn btn-primary" style="width:100%;margin-top:12px" id="tip-go">${F.wallet.connected ? "Send" : "Connect wallet"}</button>
+      <p class="note" style="margin-top:10px">Sent straight from your wallet to theirs — ${F.esc(F.cfg.siteName)} never touches your funds. Transfers are final, so double-check who you're sending to.</p>
+    </div></div>`);
+    m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-x]")) m.remove(); });
+    document.body.appendChild(m);
+    const inp = F.$("#tip-amt", m), go = F.$("#tip-go", m);
+    let bal = null, sol = null, busy = false;
+    F.solUsd().then((p) => { sol = p; paint(); });
+    const loadBal = () => { if (F.wallet.connected) F.solBalance(F.wallet.pubkey).then((b) => { bal = b; F.$("#tip-bal", m).textContent = b.toFixed(4) + " SOL"; paint(); }).catch(() => {}); };
+    loadBal();
+    const amt = () => { const v = Number(String(inp.value).replace(",", ".")); return isFinite(v) && v > 0 ? v : 0; };
+    function paint() {
+      const v = amt();
+      F.$("#tip-usd", m).innerHTML = v && sol ? `≈ ${F.usd(v * sol)}` : "&nbsp;";
+      F.$("#tip-big", m).classList.toggle("hidden", !(v >= 1));
+      if (!busy) go.textContent = !F.wallet.connected ? "Connect wallet" : v ? `Send ${v} SOL to ${to.name || F.short(to.wallet)}` : "Enter an amount";
+    }
+    inp.oninput = paint;
+    m.addEventListener("click", (e) => { const c = e.target.closest("[data-tv]"); if (c) { inp.value = c.dataset.tv; paint(); } });
+    const onW = () => { if (m.isConnected) { loadBal(); paint(); } };
+    document.addEventListener("flow:wallet", onW);
+    go.onclick = async () => {
+      if (!F.wallet.connected) return F.openWalletModal();
+      const v = amt();
+      if (!v) return F.toast("Enter an amount", "", "warn");
+      if (v < 0.001) return F.toast("Minimum is 0.001 SOL", "", "warn");
+      if (bal != null && v > bal - 0.001) return F.toast("Not enough SOL", "Keep about 0.001 SOL in your wallet for fees.", "warn");
+      if (v >= 1 && !F.$("#tip-ok", m).checked) return F.toast("Please confirm", "Tick the box to confirm this amount.", "warn");
+      busy = true; go.disabled = true; go.textContent = "Preparing…";
+      try {
+        await loadWeb3();
+        const W = window.solanaWeb3;
+        const from = new W.PublicKey(F.wallet.pubkey), dest = new W.PublicKey(to.wallet);
+        const { value } = await F.rpc("getLatestBlockhash", [{ commitment: "confirmed" }]);
+        const msg = new W.TransactionMessage({ payerKey: from, recentBlockhash: value.blockhash, instructions: [W.SystemProgram.transfer({ fromPubkey: from, toPubkey: dest, lamports: Math.round(v * 1e9) })] }).compileToV0Message();
+        const bytes = new W.VersionedTransaction(msg).serialize();
+        let bin = ""; bytes.forEach((x) => (bin += String.fromCharCode(x)));
+        go.textContent = "Confirm in your wallet…";
+        const sig = await F.wallet.sendBase64Tx(btoa(bin));
+        go.textContent = "Sending…";
+        const res = await F.wallet.confirm(sig);
+        m.remove();
+        if (res.ok === false) F.toast("Transfer failed", `<a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">View on Solscan</a>`, "err");
+        else F.toast(`Sent ${v} SOL ✓`, `To ${name}. <a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">View on Solscan</a>`);
+      } catch (e) {
+        F.toast("Not sent", F.esc(e.message || String(e)), "err");
+        busy = false; go.disabled = false; paint();
+      }
+    };
+    paint(); setTimeout(() => inp.focus(), 50);
+  };
+
   /* ================= streamer mode: hide balances ================= */
   const eyeOn = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
   const eyeOff = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.9 0 3.5-.6 4.9-1.4M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`;

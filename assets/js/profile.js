@@ -32,7 +32,7 @@
           <div class="pshow" id="pshow"></div>
         </div>
         <div class="actions">
-          <span id="phide"></span><span id="pach"></span><span id="pedit"></span><span id="pdm"></span>
+          <span id="phide"></span><span id="pach"></span><span id="pedit"></span><span id="ptip"></span><span id="pdm"></span>
           <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
@@ -392,6 +392,11 @@
     if (!F.$("#pname")) return;
     const me = F.auth.isMe?.(addr), connectedHere = F.wallet.pubkey === addr;
     document.body.classList.toggle("own-profile", !!(me || connectedHere));
+    const tp = F.$("#ptip");
+    if (tp && F.sendSolModal) {
+      tp.innerHTML = me || connectedHere ? "" : `<button class="btn btn-primary btn-sm tip-btn" id="tipbtn"><span class="tip-sol">◎</span>Send SOL</button>`;
+      const tb = F.$("#tipbtn"); if (tb) tb.onclick = () => F.sendSolModal({ wallet: addr, name: member?.name || null, avatar_url: member?.avatar_url || null });
+    }
     const hb = F.$("#phide");
     if (hb) hb.innerHTML = me || connectedHere ? F.hideBalBtn() : "";
     F.$("#pname").innerHTML = `${member?.name ? F.esc(member.name) : F.short(addr, 6)} ${F.founderBadge(addr)} ${me || connectedHere ? '<span class="badge blue">You</span>' : ""}${member?.banned ? ' <span class="badge suspended" title="This account was suspended for breaking the rules">Suspended</span>' : ""}`;
