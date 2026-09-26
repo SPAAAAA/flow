@@ -337,6 +337,7 @@
   }
 
   /* ================= send SOL to another member ================= */
+  F.loadWeb3 = () => loadWeb3();
   function loadWeb3() {
     if (window.solanaWeb3) return Promise.resolve();
     return new Promise((res, rej) => {
@@ -407,6 +408,7 @@
         m.remove();
         if (res.ok === false) F.toast("Transfer failed", `<a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">View on Solscan</a>`, "err");
         else F.toast(`Sent ${v} SOL ✓`, `To ${name}. <a href="${F.solscanTx(sig)}" target="_blank" rel="noopener">View on Solscan</a>`);
+        if (res.ok !== false && F.auth?.profile) F.logTip(sig, to.wallet);
       } catch (e) {
         F.toast("Not sent", F.esc(e.message || String(e)), "err");
         busy = false; go.disabled = false; paint();

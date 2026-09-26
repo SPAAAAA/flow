@@ -18,7 +18,7 @@
       const need = [...new Set(list)].filter((w) => w && !cache.has(w));
       for (let i = 0; i < need.length; i += 100) {
         const chunk = need.slice(i, i + 100);
-        const { data } = await F.sb.from("profiles").select("id,wallet,name,avatar_url,last_seen,created_at,bio,banner_url,x_handle,tiktok_handle,banned").in("wallet", chunk);
+        const { data } = await F.sb.from("profiles").select("id,wallet,name,avatar_url,last_seen,created_at,bio,banner_url,x_handle,tiktok_handle,banned,cos_frame,cos_name,cos_fx").in("wallet", chunk);
         chunk.forEach((w) => cache.set(w, null));
         (data || []).forEach((p) => cache.set(p.wallet, p));
       }

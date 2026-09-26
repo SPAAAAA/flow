@@ -39,6 +39,7 @@
     </div>
     <div class="coin-side">
       <div class="panel trade" id="trade"></div>
+      <div class="panel room" id="room"></div>
       <div class="panel" id="curve" style="display:none"></div>
       <div class="panel" id="pos"></div>
       <div class="panel" id="safety"></div>
@@ -517,6 +518,7 @@
   (async () => {
     await loadCoin();
     loadChart(true); loadTrades(); loadInfo(); loadBalances(); renderPos();
+    if (F.mountRoom) F.mountRoom(F.$("#room"), mint, S.coin?.symbol);
     F.$$("#subtabs button").forEach((x) => x.classList.toggle("active", x.dataset.t === S.tab));
     if (S.tab === "comments") renderComments(); else renderTrades();
     if (F.coinThreadCount) F.coinThreadCount(mint).then((n) => { const e = F.$("#ccount"); if (e && n) e.textContent = n > 999 ? "999+" : n; });

@@ -141,7 +141,7 @@
       <div class="post-main">
         <div class="post-top">
           <a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-name">${F.displayName(u)}</a>${F.founderBadge(u.wallet, true)}${F.lvlTag ? F.lvlTag(u.id || p.user_id) : ""}
-          <span class="post-handle mono">${F.short(u.wallet || "")}</span><span class="muted">·</span>
+          <span class="post-handle mono">${F.short(u.wallet || "")}</span>${ctxCoin && F.htag ? F.htag(u.wallet, u.id || p.user_id, ctxCoin) : ""}<span class="muted">·</span>
           <a class="post-time" href="post.html?p=${p.id}" title="${new Date(p.created_at).toLocaleString()}">${when(p.created_at)}</a>
           ${canMod(p.user_id) ? `<button class="post-del" data-del-post="${p.id}" title="Delete post">${trash}</button>` : ""}
         </div>
@@ -222,7 +222,7 @@
     return `<div class="cmt" data-cmt="${c.id}">
       <a href="profile.html?a=${F.esc(u.wallet || "")}"><img src="${F.avatarOf(u)}" alt=""></a>
       <div class="cmt-body"><div class="cmt-top"><a href="profile.html?a=${F.esc(u.wallet || "")}" class="post-name">${F.displayName(u)}</a>${F.founderBadge(u.wallet, true)}${F.lvlTag ? F.lvlTag(u.id || c.user_id) : ""}
-        <span class="muted">· ${when(c.created_at)}</span>${F.reportBtn && !(me() && me().id === c.user_id) ? F.reportBtn("comment", c.id, "msg-rep") : ""}${canMod(c.user_id) ? `<button class="msg-del" data-del-cmt="${c.id}" data-post-of="${c.post_id}" title="Delete">×</button>` : ""}</div>
+        ${ctxCoin && F.htag ? F.htag(u.wallet, u.id || c.user_id, ctxCoin) : ""}<span class="muted">· ${when(c.created_at)}</span>${F.reportBtn && !(me() && me().id === c.user_id) ? F.reportBtn("comment", c.id, "msg-rep") : ""}${canMod(c.user_id) ? `<button class="msg-del" data-del-cmt="${c.id}" data-post-of="${c.post_id}" title="Delete">×</button>` : ""}</div>
         <div class="post-text">${fmtText(c.body)}</div></div></div>`;
   }
   async function toggleComments(id, forceOpen) {

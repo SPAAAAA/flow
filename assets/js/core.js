@@ -621,7 +621,7 @@
       </div>
       ${c.description ? `<div class="desc">${F.esc(c.description)}</div>` : ""}
       <div class="mc"><span class="muted">MC</span><b>${F.usd(c.mcap)}</b>${c.progress != null ? `<div class="progress" title="${c.progress.toFixed(0)}% to graduation"><i style="width:${c.progress}%"></i></div>` : `<span class="muted" style="margin-left:auto">Vol ${F.usd(c.vol.h24)}</span>`}</div>
-    </div>${F.starBtn(c.mint)}</a>`;
+    </div>${F.starBtn(c.mint)}${F.qbBtn ? F.qbBtn(c) : ""}</a>`;
 
   F.coinRow = (c, i) => `<tr data-href="coin.html?c=${c.mint}" style="cursor:pointer">
     <td class="rank-num">${i + 1}</td>

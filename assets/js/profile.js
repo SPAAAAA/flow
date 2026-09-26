@@ -32,12 +32,13 @@
           <div class="pshow" id="pshow"></div>
         </div>
         <div class="actions">
-          <span id="phide"></span><span id="pach"></span><span id="pedit"></span><span id="ptip"></span><span id="pdm"></span>
+          <span id="phide"></span><span id="pcos"></span><span id="pach"></span><span id="pedit"></span><span id="ptip"></span><span id="pdm"></span>
           <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
           <a class="btn btn-ghost btn-sm" href="${F.solscanAcc(addr)}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
         </div>
       </div>
       <div id="pnlcard"></div>
+      <div id="psup"></div>
       <div id="pinvite"></div>
       <div class="kpis" id="kpis">${Array(4).fill('<div class="skeleton" style="height:66px"></div>').join("")}</div>
       <div class="panel">
@@ -354,8 +355,17 @@
     const i = F.levels.info(member.id); if (!i) { el.innerHTML = ""; return; }
     const b = F.levels.badges(member.id);
     el.innerHTML = `<div class="plevel-row"><span class="lvl-pill lv${Math.min(5, Math.ceil(i.level / 5))}">Lv ${i.level}</span>
-        <div class="xpbar" title="${i.xp} / ${i.next} XP"><i style="width:${i.pct}%"></i></div><span class="muted" style="font-size:12px">${i.xp} / ${i.next} XP</span>${i.streak ? `<span class="streak-pill" title="Visited ${i.streak} days in a row">🔥 ${i.streak}-day streak</span>` : ""}</div>
+        <div class="xpbar" title="${i.xp} / ${i.next} XP"><i style="width:${i.pct}%"></i></div><span class="muted" style="font-size:12px">${i.xp} / ${i.next} XP</span>${i.streak ? `<span class="streak-pill" title="Visited ${i.streak} days in a row">🔥 ${i.streak}-day streak</span>` : ""}<span id="pseason"></span></div>
       ${b.length ? `<div class="badge-row">${b.map((x) => `<span class="mbadge" title="${F.esc(x.why)}">${x.ic} ${F.esc(x.name)}</span>`).join("")}</div>` : ""}`;
+    renderSeason().catch(() => {});
+  }
+  async function renderSeason() {
+    const el = F.$("#pseason"); if (!el || !F.season || !member) return;
+    const [s, { data: past }] = await Promise.all([F.season.of(member.id), F.sb.from("season_rewards").select("season,rank,place").eq("user_id", member.id).order("season", { ascending: false }).limit(3)]);
+    const R = Object.fromEntries(F.season.RANKS.map((r) => [r.id, r]));
+    const e2 = F.$("#pseason"); if (!e2) return;
+    e2.innerHTML = F.season.pill(+s.points || 0) + (s.place ? `<span class="muted" style="font-size:12px;margin-left:4px">#${s.place} this season</span>` : "")
+      + (past || []).map((x) => `<span class="rk rk-${x.rank} rk-past" title="Finished #${x.place} in ${F.season.label(Date.parse(x.season + "T00:00:00Z"))}">${R[x.rank]?.ic || ""} ${new Date(x.season + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", timeZone: "UTC" })}</span>`).join("");
   }
   async function renderDmBtn() {
     const slot = F.$("#pdm"); if (!slot) return;
@@ -367,6 +377,8 @@
     if (F.reportBtn) slot.insertAdjacentHTML("beforeend", ` <button class="btn btn-ghost btn-sm" data-report="user:${F.esc(member.id)}" title="Report this member">${F.icons.flag}Report</button>`);
   }
   document.addEventListener("flow:follow", () => setTimeout(renderDmBtn, 300));
+  document.addEventListener("flow:cos", () => { if (F.auth.isMe(addr)) { member = F.auth.profile; renderIdentity(); } });
+  document.addEventListener("flow:tip", (e) => { if (e.detail?.to === addr) setTimeout(() => F.renderSupporters(F.$("#psup"), addr), 1500); });
   let counts = null, countsFor = null;
   async function renderFollow() {
     const el = F.$("#pfollow"); if (!el) return;
@@ -405,7 +417,16 @@
     F.$("#pdot").classList.toggle("hidden", !F.online.has(addr));
     if (member?.name) document.title = `${member.name} — ${F.cfg.siteName}`;
     const bn = F.$("#pbanner");
-    if (bn) { bn.style.backgroundImage = member?.banner_url ? `url("${member.banner_url.replace(/"/g, "")}")` : ""; bn.classList.toggle("has", !!member?.banner_url); }
+    if (bn) { bn.style.backgroundImage = member?.banner_url ? `url("${member.banner_url.replace(/"/g, "")}")` : ""; bn.classList.toggle("has", !!member?.banner_url);
+      bn.className = bn.className.replace(/\bfx-\S+/g, "").trim(); if (member?.cos_fx) bn.classList.add("fx-" + member.cos_fx); }
+    const aw = F.$(".avatar-wrap");
+    if (aw) { aw.className = aw.className.replace(/\bcf-\S+/g, "").trim(); if (member?.cos_frame) aw.classList.add("cf-" + member.cos_frame); }
+    const pn = F.$("#pname");
+    if (pn) { pn.className = pn.className.replace(/\bcn-\S+/g, "").trim(); if (member?.cos_name) pn.classList.add("cn-" + member.cos_name); }
+    const pc = F.$("#pcos");
+    if (pc) pc.innerHTML = (me && F.openCustomize) ? `<button class="btn btn-ghost btn-sm" id="cosbtn">🎨 Customize</button>` : "";
+    const cb = F.$("#cosbtn"); if (cb) cb.onclick = F.openCustomize;
+    if (F.renderSupporters && !renderIdentity.sup) { renderIdentity.sup = true; F.renderSupporters(F.$("#psup"), addr); }
     const bio = F.$("#pbio");
     if (bio) {
       const links = [];

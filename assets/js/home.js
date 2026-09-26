@@ -42,6 +42,7 @@
         <option value="0">Any liquidity</option><option value="5000">Liq ≥ $5K</option><option value="25000">Liq ≥ $25K</option><option value="100000">Liq ≥ $100K</option>
       </select>
       <div class="view-toggle"><button data-view="grid" title="Grid">${F.icons.grid}</button><button data-view="list" title="List">${F.icons.list}</button></div>
+      ${F.qbSetting ? F.qbSetting() : ""}
     </div>
     <div id="list"></div>
     <div class="load-more hidden" id="more"><button class="btn btn-ghost">Load more</button></div>`;

@@ -5,6 +5,7 @@
   const root = F.$("#lb");
   const TABS = [
     { id: "week", label: "🏆 This week" },
+    { id: "season", label: "🏅 Season" },
     { id: "pnl", label: "FLOW traders" },
     { id: "mcap", label: "Top market cap" },
     { id: "gainers", label: "Top gainers 24h" },
@@ -42,6 +43,7 @@
     if (S.tab === "traders") return renderTraders();
     if (S.tab === "members") return renderMembers();
     if (S.tab === "week") return renderWeek();
+    if (S.tab === "season") return renderSeasonTab();
     if (S.tab === "pnl") return renderPnl();
     F.$("#sub").textContent = "Live Solana meme coins tracked by FLOW";
     if (S.err) { pod.innerHTML = ""; body.innerHTML = `<div class="empty-state"><b>Couldn't load</b>${F.esc(S.err)}</div>`; return; }
@@ -178,6 +180,48 @@
       ${["trader", "call", "poster"].map((k) => cats[k] ? `<div class="hof-item"><span>${IC[k]}</span>${who(P(cats[k].user_id))}<span class="muted" style="font-size:12px;margin-left:auto">${F.esc(cats[k].detail || "")}</span></div>` : "").join("")}</div>`).join("")}</div>`;
   }
 
+  /* ---------- seasons & ranks ---------- */
+  let seTimer = null;
+  function seCountdown() {
+    const el = F.$("#se-cd"); if (!el) { clearInterval(seTimer); return; }
+    let s = Math.max(0, Math.floor((F.season.end() - Date.now()) / 1000));
+    const d = Math.floor(s / 86400); s %= 86400; const h = Math.floor(s / 3600); s %= 3600;
+    el.textContent = `${d}d ${h}h ${Math.floor(s / 60)}m`;
+  }
+  async function renderSeasonTab() {
+    const body = F.$("#body"); F.$("#podium").innerHTML = "";
+    if (!F.auth.enabled || !F.season) return needSupabase();
+    F.$("#sub").textContent = "A new season starts on the 1st of every month (UTC)";
+    body.innerHTML = `<div class="skeleton" style="height:360px"></div>`;
+    F.sb.rpc("award_last_season").then(() => {}, () => {});
+    const [board, { data: past }] = await Promise.all([F.season.board(), F.sb.from("season_rewards").select("*").lte("place", 3).order("season", { ascending: false }).order("place").limit(30)]);
+    await loadProfs([...board.slice(0, 50).map((r) => r.user_id), ...(past || []).map((r) => r.user_id)]);
+    if (S.tab !== "season") return;
+    const R = F.season.RANKS;
+    const my = F.auth.profile ? board.findIndex((r) => r.user_id === F.auth.profile.id) : -1;
+    const mine = my >= 0 ? board[my] : null, mp = +(mine?.points || 0), mr = F.season.rankOf(mp);
+    const top = board.slice(0, 50);
+    const seasonsPast = new Map(); (past || []).forEach((r) => { if (!seasonsPast.has(r.season)) seasonsPast.set(r.season, []); seasonsPast.get(r.season).push(r); });
+    body.innerHTML = `<div class="season-hero rk-bg-${mr.id}">
+        <div class="season-l"><div class="week-title">🏅 Season · ${F.esc(F.season.label())}</div>
+          <div class="muted">Ends in <b id="se-cd" style="color:var(--text)"></b> · finish in a rank to keep its season badge forever</div></div>
+        ${F.auth.profile ? `<div class="season-me"><div class="season-rank-big rk-${mr.id}">${mr.ic}</div><div><div style="font-weight:800;font-size:18px">${mr.name}</div>
+          <div class="muted" style="font-size:13px">${mp.toLocaleString()} points${mine ? ` · #${my + 1}` : ""}</div>
+          ${mr.next ? `<div class="season-bar"><i style="width:${mr.pct}%"></i></div><div class="muted" style="font-size:12px">${(mr.next.min - mp).toLocaleString()} to ${mr.next.ic} ${mr.next.name}</div>` : `<div class="muted" style="font-size:12px">Top rank reached 🌊</div>`}</div></div>` : ""}
+      </div>
+      <div class="rank-ladder">${R.map((r) => `<div class="rung rk-${r.id} ${r.id === mr.id && F.auth.profile ? "me" : ""}"><span class="rung-ic">${r.ic}</span><b>${r.name}</b><span class="muted">${r.min.toLocaleString()}+ pts</span></div>`).join("")}</div>
+      <div class="note" style="margin:0 0 14px">Season points: post +10 · like received +3 · comment +4 · verified trade +8 · daily visit +5 · friend invited +100 · every 1 SOL realized profit +50.</div>
+      ${top.length ? `<div class="table-wrap"><table class="t"><thead><tr><th>#</th><th>Member</th><th>Rank</th><th class="num">Points</th><th class="num">Posts</th><th class="num">Likes</th><th class="num">Trades</th><th class="num">Profit</th></tr></thead><tbody>
+        ${top.map((r, i) => { const p = P(r.user_id), rk = F.season.rankOf(+r.points); return `<tr data-href="profile.html?a=${F.esc(p.wallet)}" style="cursor:pointer" class="${F.auth.profile?.id === r.user_id ? "me-row" : ""}"><td class="rank-num">${["🥇", "🥈", "🥉"][i] || i + 1}</td>
+          <td><div class="coin-cell"><img src="${F.avatarOf(p)}" alt="" style="border-radius:50%"><span>${F.displayName(p)} ${F.founderBadge(p.wallet, true)}</span></div></td>
+          <td><span class="rk rk-${rk.id}">${rk.ic} ${rk.name}</span></td><td class="num"><b>${(+r.points).toLocaleString()}</b></td>
+          <td class="num">${r.posts}</td><td class="num">${r.likes}</td><td class="num">${r.trades}</td><td class="num ${+r.profit > 0 ? "up" : +r.profit < 0 ? "down" : ""}">${F.fmtSol(+r.profit, 2)}</td></tr>`; }).join("")}
+        </tbody></table></div>` : `<div class="empty-state"><b>The season just started</b>Post, trade and visit daily to climb the ranks.</div>`}
+      <h3 style="margin:26px 0 12px;font-size:15px">🏛️ Past seasons</h3>
+      ${seasonsPast.size ? `<div class="hof">${[...seasonsPast.entries()].map(([s, rows]) => `<div class="hof-week"><div class="hof-date">${F.esc(F.season.label(Date.parse(s + "T00:00:00Z")))}</div>${rows.map((r) => `<div class="hof-item"><span>${["🥇", "🥈", "🥉"][r.place - 1]}</span>${who(P(r.user_id))}<span class="rk rk-${r.rank}" style="margin-left:auto">${R.find((x) => x.id === r.rank)?.ic || ""} ${(+r.points).toLocaleString()}</span></div>`).join("")}</div>`).join("")}</div>` : `<p class="muted" style="font-size:13px">The first season ends on the 1st — winners appear here.</p>`}`;
+    seCountdown(); clearInterval(seTimer); seTimer = setInterval(seCountdown, 30000);
+  }
+
   /* ---------- FLOW traders (verified PnL) ---------- */
   async function renderPnl() {
     const body = F.$("#body"), pod = F.$("#podium");
@@ -236,7 +280,7 @@
   document.addEventListener("flow:auth", rerenderMembers);
 
   (async () => {
-    const own = ["members", "week", "pnl"];
+    const own = ["members", "week", "pnl", "season"];
     if (own.includes(S.tab)) render();
     try { S.coins = await F.loadUniverse(); } catch (e) { S.err = e.message; }
     if (!own.includes(S.tab)) render();
