@@ -112,6 +112,14 @@
     { cat: "Seasons", id: "seasons3", ic: "📆", name: "Season Veteran", r: "r", desc: "Finish 3 seasons", cur: (s) => n(s.seasons), goal: 3, unit: "seasons" },
     { cat: "Seasons", id: "pts1000", ic: "⚡", name: "Point Machine", r: "r", desc: "Earn 1,000 points in one season", cur: (s) => n(s.season_now), goal: 1000, unit: "points this season" },
 
+    // ---------- Teams ----------
+    { cat: "Teams", id: "team_join", ic: "🤝", name: "Team Player", r: "u", desc: "Join or create a team", cur: (s) => b(s.in_team), goal: 1 },
+    { cat: "Teams", id: "team_own", ic: "🚩", name: "Captain", r: "c", desc: "Create your own team", cur: (s) => b(s.team_owner), goal: 1 },
+    { cat: "Teams", id: "team10", ic: "👨‍👩‍👧‍👦", name: "Squad Goals", r: "r", desc: "Be in a team with 10+ members", cur: (s) => n(s.team_size), goal: 10, unit: "team members" },
+    { cat: "Teams", id: "team50", ic: "🏰", name: "Full House", r: "e", desc: "Be in a full team of 50 members", cur: (s) => n(s.team_size), goal: 50, unit: "team members" },
+    { cat: "Teams", id: "team_chat", ic: "📢", name: "Rally Cry", r: "r", desc: "Send 100 messages in team chat", cur: (s) => n(s.team_msgs), goal: 100, unit: "team messages" },
+    { cat: "Teams", id: "team_top", ic: "🏆", name: "Top Team", r: "l", desc: "Be in the #1 team on the season leaderboard", cur: (s) => b(n(s.team_rank) === 1 && n(s.team_size) >= 5), goal: 1 },
+
     // ---------- Style ----------
     { cat: "Style", id: "dressed", ic: "👔", name: "Dressed Up", r: "u", desc: "Equip a frame, name colour or banner effect", cur: (s) => n(s.cosmetics), goal: 1, unit: "cosmetic" },
     { cat: "Style", id: "drip", ic: "💅", name: "Full Drip", r: "r", desc: "Wear a frame, name colour and banner effect at once", cur: (s) => n(s.cosmetics), goal: 3, unit: "cosmetics" },
@@ -135,9 +143,9 @@
   const cache = new Map();
   async function statsFor(uid) {
     if (cache.has(uid) && Date.now() - cache.get(uid).at < 60000) return cache.get(uid).s;
-    const { data, error } = await F.sb.rpc("achievement_stats", { uid });
+    const [{ data, error }, ts] = await Promise.all([F.sb.rpc("achievement_stats", { uid }), F.sb.rpc("team_stats", { uid }).then((r) => r.data || {}, () => ({}))]);
     if (error || !data) throw error || new Error("No data");
-    const s = { ...data };
+    const s = { ...data, ...ts };
     // trade results from verified trades
     try {
       const rows = await F.pnl(uid);

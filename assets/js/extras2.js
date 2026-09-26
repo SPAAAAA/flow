@@ -158,10 +158,27 @@
   F.cosOf = (w) => cosCache.get(w) || null;
   F.cosRemember = (p) => { if (p?.wallet) cosCache.set(p.wallet, { cos_frame: p.cos_frame || null, cos_name: p.cos_name || null, cos_fx: p.cos_fx || null }); };
   const pendingW = new Set(); let cosT;
+  const teamCache = new Map(); // wallet -> {id, tag, color} | null
+  F.teamOfWallet = (w) => teamCache.get(w) || null;
+  F.teamsForget = () => { teamCache.clear(); F.$$("[data-tt]").forEach((a) => { delete a.dataset.tt; }); F.$$(".ttag.auto").forEach((x) => x.remove()); cosCache.clear(); };
+  function applyTeamTag(a, w) {
+    if (!teamCache.has(w)) return;
+    const t = teamCache.get(w), key = t ? t.tag : "-";
+    if (a.dataset.tt === key) return;
+    a.dataset.tt = key;
+    const old = a.querySelector(".ttag.auto") || (a.nextElementSibling?.classList?.contains("auto") ? a.nextElementSibling : null); if (old) old.remove();
+    if (!t || a.closest(".t-mem-who,.t-mine,.t-hero,.nav,.adm-who,.tip-to")) return;
+    const pill = `<a class="ttag auto tc-${F.esc(t.color)}" href="teams.html?t=${t.id}" title="Team ${F.esc(t.name || t.tag)}">${F.esc(t.tag)}</a>`;
+    const nameEl = a.querySelector(".n,.post-name,.msg-name,.room-n,b");
+    if (a.querySelector("img")) { if (nameEl) nameEl.insertAdjacentHTML("afterend", pill.replace("<a ", "<span ").replace("</a>", "</span>")); }
+    else if (a.textContent.trim() && !a.closest("#pname")) a.insertAdjacentHTML("afterend", pill);
+  }
   function applyCos(root = document) {
     F.$$('a[href*="profile.html?a="]', root).forEach((a) => {
       let w; try { w = new URL(a.href).searchParams.get("a"); } catch { return; }
       if (!w) return;
+      applyTeamTag(a, w);
+      if (!teamCache.has(w)) pendingW.add(w);
       const c = cosCache.get(w);
       if (!c) { pendingW.add(w); return; }
       if (a.dataset.cos === (c.cos_frame || "") + "|" + (c.cos_name || "")) return;
@@ -177,6 +194,11 @@
     if (loadingCos || !F.sb) return; loadingCos = true;
     const ws = [...pendingW].slice(0, 150); ws.forEach((w) => pendingW.delete(w));
     try { const { data } = await F.sb.from("profiles").select("wallet,cos_frame,cos_name,cos_fx").in("wallet", ws); ws.forEach((w) => cosCache.set(w, { cos_frame: null, cos_name: null, cos_fx: null })); (data || []).forEach(F.cosRemember); } catch {}
+    try {
+      const { data: tm } = await F.sb.from("team_members").select("teams(id,name,tag,color),profiles!inner(wallet)").in("profiles.wallet", ws);
+      ws.forEach((w) => teamCache.set(w, null));
+      (tm || []).forEach((r) => { if (r.profiles?.wallet && r.teams) teamCache.set(r.profiles.wallet, r.teams); });
+    } catch {}
     loadingCos = false; applyCos();
   }
   new MutationObserver(() => { clearTimeout(cosT); cosT = setTimeout(() => applyCos(), 200); }).observe(document.body, { childList: true, subtree: true });

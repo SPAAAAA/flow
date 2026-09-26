@@ -27,6 +27,7 @@
           <h1 id="pname">${F.short(addr, 6)}</h1>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="copy" id="cp">${F.short(addr, 10)} ${F.icons.copy}</button><span class="muted" style="font-size:12px" id="psince"></span></div>
           <div class="pbio" id="pbio"></div>
+          <div id="pteam"></div>
           <div class="follow-counts" id="pfollow"></div>
           <div class="plevel" id="plevel"></div>
           <div class="pshow" id="pshow"></div>
@@ -423,6 +424,9 @@
     if (aw) { aw.className = aw.className.replace(/\bcf-\S+/g, "").trim(); if (member?.cos_frame) aw.classList.add("cf-" + member.cos_frame); }
     const pn = F.$("#pname");
     if (pn) { pn.className = pn.className.replace(/\bcn-\S+/g, "").trim(); if (member?.cos_name) pn.classList.add("cn-" + member.cos_name); }
+    const ptm = F.$("#pteam");
+    if (ptm && member && F.sb) F.sb.from("team_members").select("role,teams(id,name,tag,emblem,color)").eq("user_id", member.id).maybeSingle().then(({ data }) => {
+      const t = data?.teams; ptm.innerHTML = t ? `<a class="pteam tc-bd-${F.esc(t.color)}" href="teams.html?t=${t.id}"><span class="t-emb tc-${F.esc(t.color)} sm">${F.esc(t.emblem)}</span>${F.esc(t.name)} <span class="ttag tc-${F.esc(t.color)}">${F.esc(t.tag)}</span>${data.role === "owner" ? " 👑" : data.role === "officer" ? " ⭐" : ""}</a>` : ""; });
     const pc = F.$("#pcos");
     if (pc) pc.innerHTML = (me && F.openCustomize) ? `<button class="btn btn-ghost btn-sm" id="cosbtn">🎨 Customize</button>` : "";
     const cb = F.$("#cosbtn"); if (cb) cb.onclick = F.openCustomize;
