@@ -167,7 +167,7 @@
     if (a.dataset.tt === key) return;
     a.dataset.tt = key;
     const old = a.querySelector(".ttag.auto") || (a.nextElementSibling?.classList?.contains("auto") ? a.nextElementSibling : null); if (old) old.remove();
-    if (!t || a.closest(".t-mem-who,.t-mine,.t-hero,.nav,.adm-who,.tip-to")) return;
+    if (!t || a.closest(".t-mem-who,.t-mine,.t-hero,.nav,.adm-who,.tip-to,.toast,.notif-txt")) return;
     const pill = `<a class="ttag auto tc-${F.esc(t.color)}" href="teams.html?t=${t.id}" title="Team ${F.esc(t.name || t.tag)}">${F.esc(t.tag)}</a>`;
     const nameEl = a.querySelector(".n,.post-name,.msg-name,.room-n,b");
     if (a.querySelector("img")) { if (nameEl) nameEl.insertAdjacentHTML("afterend", pill.replace("<a ", "<span ").replace("</a>", "</span>")); }
