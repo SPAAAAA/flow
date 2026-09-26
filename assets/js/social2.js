@@ -93,6 +93,7 @@
       case "follow": return `${who} started following you`;
       case "buy": return `${who} bought ${n.sol_amount ? F.num(n.sol_amount, 3) + " SOL of " : ""}<b>$${F.esc(n.symbol || "coin")}</b>`;
       case "sell": return `${who} sold ${n.sol_amount ? F.num(n.sol_amount, 3) + " SOL of " : ""}<b>$${F.esc(n.symbol || "coin")}</b>`;
+      case "team_call": return `${who} called <b>$${F.esc(n.symbol || "coin")}</b> to your team 🎯`;
       case "tip": return `${who} sent you <b>${n.sol_amount ? F.num(n.sol_amount, 4) : ""} SOL</b> 💸`;
       case "mention": return `${who} mentioned you`;
     }
@@ -100,10 +101,10 @@
   }
   function href(n) {
     if (n.type === "like" || n.type === "comment" || n.type === "mention") return n.post_id ? `post.html?p=${n.post_id}` : "post.html";
-    if (n.type === "buy" || n.type === "sell") return `coin.html?c=${n.mint}`;
+    if (n.type === "buy" || n.type === "sell" || n.type === "team_call") return `coin.html?c=${n.mint}`;
     return `profile.html?a=${n.actor?.wallet || ""}`;
   }
-  const icon = { like: "♥", comment: "💬", follow: "➕", buy: "🟦", sell: "🟥", tip: "💸", mention: "@" };
+  const icon = { like: "♥", comment: "💬", follow: "➕", buy: "🟦", sell: "🟥", tip: "💸", mention: "@", team_call: "🎯" };
 
   function renderBell() {
     const slot = F.$("#bell-slot"); if (!slot) return;
@@ -116,7 +117,7 @@
     return N.list.map((n) => `<a class="notif ${n.read ? "" : "unread"}" href="${href(n)}">
       <span class="notif-ic">${icon[n.type] || "•"}</span>
       <img src="${F.avatarOf(n.actor)}" alt="">
-      <span class="notif-txt">${text(n)}<span class="muted"> · ${F.ago(Date.parse(n.created_at))}</span>${n.type === "buy" && n.mint && F.qbBtn ? `<button class="notif-buy" data-qbuy="${F.esc(n.mint)}" data-sym="${F.esc(n.symbol || "")}">⚡ Buy too · ${F.qb.amt} SOL</button>` : ""}</span></a>`).join("");
+      <span class="notif-txt">${text(n)}<span class="muted"> · ${F.ago(Date.parse(n.created_at))}</span>${(n.type === "buy" || n.type === "team_call") && n.mint && F.qbBtn ? `<button class="notif-buy" data-qbuy="${F.esc(n.mint)}" data-sym="${F.esc(n.symbol || "")}">⚡ Buy too · ${F.qb.amt} SOL</button>` : ""}</span></a>`).join("");
   }
   function openPanel() {
     closePanel();

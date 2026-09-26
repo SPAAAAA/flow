@@ -265,6 +265,30 @@
     async of(uid) { const b = await this.board(); const i = b.findIndex((r) => r.user_id === uid); return i >= 0 ? { ...b[i], place: i + 1 } : { user_id: uid, points: 0, place: null }; },
   };
 
+  /* ================= call a coin to your team ================= */
+  F.callToTeam = async (coin) => {
+    if (!F.auth?.enabled || !coin?.mint) return;
+    if (!me()) return F.auth.signIn();
+    const { data: tm } = await F.sb.from("team_members").select("team_id,teams(id,name,tag,emblem,color)").eq("user_id", me().id).maybeSingle();
+    const t = tm?.teams;
+    const m = F.h(`<div class="modal-bg"><div class="modal" style="max-width:420px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">🎯 Call to team</h3><button class="icon-btn" data-x>${F.icons.close}</button></div>
+      ${t ? `<p style="margin:0 0 12px;font-size:13px">Tell <b>${F.esc(t.name)}</b> <span class="ttag tc-${F.esc(t.color)}">${F.esc(t.tag)}</span> about <b>$${F.esc(coin.symbol)}</b> (MC ${F.usd(coin.mcap)}). Every teammate gets a notification with a ⚡ Buy button, and the call's performance is tracked.</p>
+        <input class="input" id="ct-note" maxlength="140" placeholder="Why this coin? (optional)">
+        <button class="btn btn-primary" style="width:100%;margin-top:12px" id="ct-go">🎯 Call $${F.esc(coin.symbol)}</button>`
+        : `<p style="margin:0 0 12px;font-size:13px">Join or create a team to call coins to your teammates.</p><a class="btn btn-primary" style="width:100%" href="teams.html">Find a team</a>`}</div></div>`);
+    m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-x]")) m.remove(); });
+    document.body.appendChild(m);
+    const go = F.$("#ct-go", m);
+    if (go) go.onclick = async () => {
+      go.disabled = true;
+      const note = F.$("#ct-note", m).value.trim() || null;
+      const { error } = await F.sb.from("team_calls").insert({ team_id: t.id, user_id: me().id, mint: coin.mint, symbol: (coin.symbol || "").slice(0, 20), note });
+      if (error) { go.disabled = false; return F.toast("Not called", F.esc(error.message.replace(/^.*?: /, "")), "warn"); }
+      m.remove(); F.toast(`Called $${F.esc(coin.symbol)} to ${F.esc(t.name)} 🎯`, `<a href="teams.html?t=${t.id}&tab=calls">See team calls</a>`);
+    };
+  };
+
   /* ================= live coin rooms ================= */
   F.mountRoom = (el, mint, symbol) => {
     if (!el || !F.auth?.enabled) { if (el) el.style.display = "none"; return; }

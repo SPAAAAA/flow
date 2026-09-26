@@ -107,12 +107,14 @@
         <button class="btn btn-ghost btn-sm" data-star="${c.mint}" style="position:static">${F.watch.has(c.mint) ? F.icons.starFill : F.icons.star}</button>
         <button class="btn btn-ghost btn-sm" id="share">${F.icons.copy}Share</button>
         ${F.alertModal ? `<button class="btn btn-ghost btn-sm" id="alertbtn">${F.icons.bell}Alert</button>` : ""}
+        ${F.callToTeam ? `<button class="btn btn-ghost btn-sm" id="callteam">🎯 Call to team</button>` : ""}
         ${c.dsUrl ? `<a class="btn btn-ghost btn-sm" href="${F.esc(c.dsUrl)}" target="_blank" rel="noopener">DEX Screener ${F.icons.ext}</a>` : ""}
         <a class="btn btn-ghost btn-sm" href="https://solscan.io/token/${c.mint}" target="_blank" rel="noopener">Solscan ${F.icons.ext}</a>
       </div>`;
     F.$("#copyca").onclick = () => F.copy(c.mint, "Contract address copied");
     F.$("#share").onclick = () => F.copy(location.href, "Link copied");
     const ab = F.$("#alertbtn"); if (ab) ab.onclick = () => F.alertModal(S.coin);
+    const ct = F.$("#callteam"); if (ct) ct.onclick = () => F.callToTeam(S.coin);
   }
   function renderStats() {
     const c = S.coin; if (!c) return;

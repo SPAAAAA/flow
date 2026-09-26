@@ -117,6 +117,8 @@
     { cat: "Teams", id: "team_own", ic: "🚩", name: "Captain", r: "c", desc: "Create your own team", cur: (s) => b(s.team_owner), goal: 1 },
     { cat: "Teams", id: "team10", ic: "👨‍👩‍👧‍👦", name: "Squad Goals", r: "r", desc: "Be in a team with 10+ members", cur: (s) => n(s.team_size), goal: 10, unit: "team members" },
     { cat: "Teams", id: "team50", ic: "🏰", name: "Full House", r: "e", desc: "Be in a full team of 50 members", cur: (s) => n(s.team_size), goal: 50, unit: "team members" },
+    { cat: "Teams", id: "tcall1", ic: "📡", name: "Signal", r: "u", desc: "Call a coin to your team", cur: (s) => n(s.team_calls), goal: 1, unit: "call" },
+    { cat: "Teams", id: "tcall25", ic: "🛰️", name: "Team Scout", r: "r", desc: "Call 25 coins to your team", cur: (s) => n(s.team_calls), goal: 25, unit: "calls" },
     { cat: "Teams", id: "team_chat", ic: "📢", name: "Rally Cry", r: "r", desc: "Send 100 messages in team chat", cur: (s) => n(s.team_msgs), goal: 100, unit: "team messages" },
     { cat: "Teams", id: "team_top", ic: "🏆", name: "Top Team", r: "l", desc: "Be in the #1 team on the season leaderboard", cur: (s) => b(n(s.team_rank) === 1 && n(s.team_size) >= 5), goal: 1 },
 

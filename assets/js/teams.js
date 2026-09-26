@@ -169,7 +169,7 @@
           <div class="t-stats"><span><b>${members.length}</b>/${CAP} members</span><span><b>${total.toLocaleString()}</b> season points</span><span>${t.join_mode === "open" ? "🔓 Open" : "✋ Request to join"}</span></div>
           <div class="t-bar"><i style="width:${(members.length / CAP) * 100}%"></i></div></div>
         <div class="t-hero-act">${act}<button class="btn btn-ghost" id="t-share">${F.icons.copy}Invite link</button></div></div>
-      <div class="panel"><div class="subtabs" id="tp-tabs"><button data-t="members">Members</button>${myRole ? `<button data-t="chat">💬 Team chat</button>` : ""}${isMgr ? `<button data-t="requests">Requests <span class="tab-count" id="rq-n"></span></button>` : ""}</div><div id="tp-body"></div></div>`;
+      <div class="panel"><div class="subtabs" id="tp-tabs"><button data-t="members">Members</button>${myRole ? `<button data-t="calls">🎯 Calls</button><button data-t="chat">💬 Team chat</button><button data-t="voice">🎙️ Voice <span class="tab-count" id="v-n"></span></button>` : ""}${isMgr ? `<button data-t="requests">Requests <span class="tab-count" id="rq-n"></span></button>` : ""}</div><div id="tp-body"></div></div>`;
     const ids = { join: F.$("#t-join"), leave: F.$("#t-leave"), cancel: F.$("#t-cancel"), edit: F.$("#t-edit"), signin: F.$("#t-signin") };
     if (ids.signin) ids.signin.onclick = F.auth.signIn;
     if (ids.join) ids.join.onclick = async () => { const { data, error } = await F.sb.rpc("team_join", { tid: t.id }); if (error) return err(error); F.toast(data === "joined" ? `Welcome to ${F.esc(t.name)} 🎉` : "Request sent ✋", data === "joined" ? "" : "An owner or officer will review it."); F.teamsForget && F.teamsForget(); teamPage(t.id); };
@@ -179,16 +179,19 @@
       const { error } = await F.sb.rpc("team_leave"); if (error) return err(error); F.toast("You left the team", ""); F.teamsForget && F.teamsForget(); location.href = "teams.html"; };
     if (ids.edit) ids.edit.onclick = () => teamForm(t);
     F.$("#t-share").onclick = () => F.copy(new URL("teams.html?t=" + t.id, location.href).href, "Team link copied");
-    let tab = F.qs("tab") === "chat" && myRole ? "chat" : "members";
+    let tab = ["chat", "calls", "voice"].includes(F.qs("tab")) && myRole ? F.qs("tab") : "members";
     const tabs = F.$("#tp-tabs");
     const draw = () => {
       F.$$("button", tabs).forEach((b) => b.classList.toggle("active", b.dataset.t === tab));
       if (tab === "members") drawMembers(t, members, pts, myRole);
       else if (tab === "chat") drawChat(t);
+      else if (tab === "calls") drawCalls(t);
+      else if (tab === "voice") drawVoice(t);
       else drawRequests(t);
     };
     tabs.onclick = (e) => { const b = e.target.closest("[data-t]"); if (!b) return; tab = b.dataset.t; draw(); };
     draw();
+    if (myRole) voiceWatch(t);
     if (isMgr) { const { count } = await F.sb.from("team_requests").select("user_id", { count: "exact", head: true }).eq("team_id", t.id); const n = F.$("#rq-n"); if (n && count) n.textContent = count; }
   }
 
@@ -249,6 +252,160 @@
       if (error) { inp.value = body; return err(error); }
       add(data); list.scrollTop = list.scrollHeight;
     };
+  }
+
+  /* ================= team calls ================= */
+  async function drawCalls(t) {
+    const box = F.$("#tp-body");
+    box.innerHTML = `<form class="tcall-form" id="tcall-form"><input class="input" id="tcall-ca" placeholder="Paste a coin contract address to call it to your team…" autocomplete="off">
+        <input class="input" id="tcall-note" maxlength="140" placeholder="Why? (optional)"><button class="btn btn-primary">🎯 Call</button></form>
+      <div class="tcall-top" id="tcall-top"></div><div id="tcall-list"><div class="skeleton" style="height:160px"></div></div>`;
+    F.$("#tcall-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const ca = F.$("#tcall-ca").value.trim(), note = F.$("#tcall-note").value.trim();
+      if (!F.isAddress(ca)) return F.toast("Paste a valid contract address", "", "warn");
+      const c = (await F.coinsByMint([ca])).get(ca);
+      const { error } = await F.sb.from("team_calls").insert({ team_id: t.id, user_id: me().id, mint: ca, symbol: (c?.symbol || "").slice(0, 20) || null, note: note || null });
+      if (error) return err(error);
+      F.toast("Called to your team 🎯", c ? `$${F.esc(c.symbol)}` : ""); F.$("#tcall-ca").value = ""; F.$("#tcall-note").value = ""; loadCalls(t);
+    };
+    loadCalls(t);
+  }
+  async function loadCalls(t) {
+    const { data } = await F.sb.from("team_calls").select("id,mint,symbol,note,created_at,user_id,profiles!team_calls_user_id_fkey(id,wallet,name,avatar_url)").eq("team_id", t.id).order("created_at", { ascending: false }).limit(50);
+    const rows = data || [], el = F.$("#tcall-list"); if (!el) return;
+    if (!rows.length) { el.innerHTML = `<div class="empty-state" style="padding:28px"><b>No calls yet</b>Found a coin? Call it to your team — everyone gets notified. You can also use “🎯 Call to team” on any coin page.</div>`; F.$("#tcall-top").innerHTML = ""; return; }
+    const coins = await F.coinsByMint(rows.map((r) => r.mint));
+    const myRoleNow = S.myTeam?.role;
+    el.innerHTML = `<div class="tcalls">${rows.map((r) => { const c = coins.get(r.mint), p = r.profiles || P(r.user_id);
+      return `<div class="tcall" data-cid="${r.id}"><a href="coin.html?c=${F.esc(r.mint)}"><img class="tcall-img" src="${F.img(c?.image, r.mint)}" alt=""></a>
+        <div class="tcall-main"><div class="tcall-top-row"><a href="coin.html?c=${F.esc(r.mint)}" class="tcall-sym">$${F.esc(c?.symbol || r.symbol || F.short(r.mint))}</a><span class="muted" style="font-size:12px">${c ? F.usd(c.mcap) + " MC now" : ""}</span><span class="tcall-perf" data-m="${F.esc(r.mint)}" data-at="${Date.parse(r.created_at)}"></span></div>
+          <div class="tcall-by"><img src="${F.avatarOf(p)}" alt=""><a href="profile.html?a=${F.esc(p.wallet || "")}">${F.displayName(p)}</a><span class="muted">· ${F.ago(Date.parse(r.created_at))} ago</span></div>
+          ${r.note ? `<div class="tcall-note">“${F.esc(r.note)}”</div>` : ""}</div>
+        <div class="tcall-act">${c && F.qbBtn ? F.qbBtn(c).replace('class="qb-btn"', 'class="qb-btn inline"') : ""}${r.user_id === me()?.id || ["owner", "officer"].includes(myRoleNow) ? `<button class="msg-del" style="opacity:1" data-cdel="${r.id}" title="Delete">×</button>` : ""}</div></div>`; }).join("")}</div>`;
+    el.onclick = async (e) => { const d = e.target.closest("[data-cdel]"); if (!d) return; await F.sb.from("team_calls").delete().eq("id", Number(d.dataset.cdel)); loadCalls(t); };
+    // performance since the call, from public price history (can't be faked)
+    const perf = {};
+    for (const pe of F.$$(".tcall-perf", el)) {
+      const at = Number(pe.dataset.at);
+      if (Date.now() - at < 5 * 60e3) { pe.innerHTML = `<span class="call-pill neutral">📍 new</span>`; continue; }
+      const r = await F.callResult(pe.dataset.m, at).catch(() => null);
+      if (!r) continue;
+      const up = r.chg >= 0; pe.innerHTML = `<span class="call-pill ${up ? "up" : "down"}">${up ? "📈" : "📉"} <b>${F.fmtPct(r.chg)}</b></span>`;
+      const row = rows.find((x) => String(x.id) === pe.closest("[data-cid]").dataset.cid);
+      if (row) { const q = perf[row.user_id] || (perf[row.user_id] = { n: 0, best: -Infinity, sum: 0 }); q.n++; q.sum += r.chg; q.best = Math.max(q.best, r.chg); }
+    }
+    const top = Object.entries(perf).sort((a, b) => b[1].best - a[1].best).slice(0, 3);
+    const tt = F.$("#tcall-top");
+    if (tt) tt.innerHTML = top.length ? `<div class="tcall-leaders"><b>Best callers</b>${top.map(([u, q], i) => `<span>${["🥇", "🥈", "🥉"][i]} ${F.displayName(P(u))} <b class="${q.best >= 0 ? "up" : "down"}">${F.fmtPct(q.best)}</b> <span class="muted">(${q.n} call${q.n > 1 ? "s" : ""})</span></span>`).join("")}</div>` : "";
+  }
+
+  /* ================= team voice (WebRTC, peer-to-peer, private channel) ================= */
+  const VMAX = 10;
+  const ICE = [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }, { urls: "stun:stun.cloudflare.com:3478" }];
+  const V = { ch: null, team: null, joined: false, stream: null, peers: new Map(), muted: false, state: {}, ctx: null, meters: new Map(), raf: null };
+  function vPeople() { return Object.entries(V.state).map(([id, arr]) => ({ id, ...(arr[0] || {}) })); }
+  function voiceWatch(t) {
+    if (V.ch && V.team === t.id) return;
+    V.team = t.id;
+    V.ch = F.sb.channel("voice-team-" + t.id, { config: { private: true, broadcast: { self: false }, presence: { key: me().id } } });
+    V.ch.on("presence", { event: "sync" }, onSync)
+      .on("broadcast", { event: "sig" }, ({ payload }) => onSignal(payload))
+      .subscribe((st) => { if (st === "CHANNEL_ERROR" || st === "TIMED_OUT") { V.err = true; paintVoice(); } });
+    window.addEventListener("beforeunload", voiceLeave);
+  }
+  function onSync() {
+    V.state = V.ch.presenceState();
+    const ids = Object.keys(V.state);
+    const n = F.$("#v-n"); if (n) n.textContent = ids.length || "";
+    if (V.joined) {
+      ids.filter((id) => id !== me().id && !V.peers.has(id) && me().id < id).forEach((id) => makePeer(id, true));
+      [...V.peers.keys()].filter((id) => !ids.includes(id)).forEach(dropPeer);
+    }
+    paintVoice();
+  }
+  function send(to, data) { V.ch?.send({ type: "broadcast", event: "sig", payload: { from: me().id, to, ...data } }); }
+  function makePeer(id, initiator) {
+    const pc = new RTCPeerConnection({ iceServers: ICE });
+    const peer = { pc, q: [], audio: null };
+    V.peers.set(id, peer);
+    V.stream.getTracks().forEach((tr) => pc.addTrack(tr, V.stream));
+    pc.onicecandidate = (e) => { if (e.candidate) send(id, { ice: e.candidate.toJSON() }); };
+    pc.ontrack = (e) => {
+      if (!peer.audio) { peer.audio = new Audio(); peer.audio.autoplay = true; peer.audio.setAttribute("playsinline", ""); }
+      peer.audio.srcObject = e.streams[0]; peer.audio.play().catch(() => {});
+      meter(id, e.streams[0]);
+    };
+    pc.onconnectionstatechange = () => { if (pc.connectionState === "failed") { dropPeer(id); if (initiator && V.joined) setTimeout(() => { if (V.state[id] && !V.peers.has(id)) makePeer(id, true); }, 1500); } paintVoice(); };
+    if (initiator) pc.onnegotiationneeded = async () => { try { await pc.setLocalDescription(await pc.createOffer()); send(id, { sdp: pc.localDescription.toJSON() }); } catch {} };
+    return peer;
+  }
+  async function onSignal(p) {
+    if (!V.joined || p.to !== me().id) return;
+    let peer = V.peers.get(p.from);
+    if (!peer) peer = makePeer(p.from, false);
+    const pc = peer.pc;
+    try {
+      if (p.sdp) {
+        await pc.setRemoteDescription(p.sdp);
+        if (p.sdp.type === "offer") { await pc.setLocalDescription(await pc.createAnswer()); send(p.from, { sdp: pc.localDescription.toJSON() }); }
+        for (const c of peer.q.splice(0)) await pc.addIceCandidate(c).catch(() => {});
+      } else if (p.ice) { pc.remoteDescription ? await pc.addIceCandidate(p.ice).catch(() => {}) : peer.q.push(p.ice); }
+    } catch {}
+  }
+  function dropPeer(id) { const p = V.peers.get(id); if (!p) return; try { p.pc.close(); } catch {} if (p.audio) p.audio.srcObject = null; V.peers.delete(id); V.meters.delete(id); }
+  function meter(id, stream) {
+    try {
+      V.ctx = V.ctx || new (window.AudioContext || window.webkitAudioContext)();
+      const src = V.ctx.createMediaStreamSource(stream), an = V.ctx.createAnalyser(); an.fftSize = 512; src.connect(an);
+      V.meters.set(id, { an, buf: new Uint8Array(an.fftSize) });
+      if (!V.raf) { const loop = () => { V.meters.forEach((m, k) => { m.an.getByteTimeDomainData(m.buf); let s = 0; for (const v of m.buf) s += (v - 128) ** 2; const on = Math.sqrt(s / m.buf.length) > 6; const el = document.querySelector(`[data-vu="${k}"]`); if (el) el.classList.toggle("speaking", on && !(k === me().id && V.muted)); }); V.raf = requestAnimationFrame(loop); }; V.raf = requestAnimationFrame(loop); }
+    } catch {}
+  }
+  async function voiceJoin() {
+    if (V.joined) return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) return F.toast("Voice isn't supported in this browser", "Try Chrome, Edge, Brave or Safari.", "warn");
+    if (Object.keys(V.state).length >= VMAX) return F.toast(`Voice room is full (${VMAX})`, "Try again when someone leaves.", "warn");
+    try { V.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+    catch { return F.toast("Microphone blocked", "Allow microphone access in your browser to talk.", "warn"); }
+    V.joined = true; V.muted = false;
+    meter(me().id, V.stream);
+    const p = me();
+    await V.ch.track({ name: p.name || F.short(p.wallet), avatar: p.avatar_url || null, wallet: p.wallet, muted: false, at: Date.now() });
+    F.toast("You joined voice 🎙️", "Your teammates can hear you now.");
+    paintVoice();
+  }
+  async function voiceLeave() {
+    if (!V.joined) return;
+    V.joined = false;
+    [...V.peers.keys()].forEach(dropPeer);
+    V.stream?.getTracks().forEach((t) => t.stop()); V.stream = null; V.meters.clear();
+    try { await V.ch?.untrack(); } catch {}
+    paintVoice();
+  }
+  async function voiceMute() {
+    V.muted = !V.muted;
+    V.stream?.getAudioTracks().forEach((t) => (t.enabled = !V.muted));
+    const p = me();
+    await V.ch.track({ name: p.name || F.short(p.wallet), avatar: p.avatar_url || null, wallet: p.wallet, muted: V.muted, at: Date.now() });
+    paintVoice();
+  }
+  function drawVoice() { paintVoice(true); }
+  function paintVoice(force) {
+    const box = F.$("#tp-body"); if (!box || (!force && !box.querySelector(".voice"))) return;
+    const people = vPeople();
+    box.innerHTML = `<div class="voice">
+      <div class="voice-head"><div><b>🎙️ Team voice</b><div class="muted" style="font-size:12px">${people.length}/${VMAX} in voice · peer-to-peer, only your team can join</div></div>
+        <div class="voice-ctl">${V.joined ? `<button class="btn btn-ghost" id="v-mute">${V.muted ? "🔇 Unmute" : "🎤 Mute"}</button><button class="btn btn-danger" id="v-leave">Leave voice</button>` : `<button class="btn btn-primary" id="v-join" ${people.length >= VMAX ? "disabled" : ""}>🎙️ Join voice</button>`}</div></div>
+      ${V.err ? `<p class="down" style="font-size:13px">Couldn't connect to the voice room. Refresh the page and try again.</p>` : ""}
+      <div class="voice-grid">${people.length ? people.map((u) => { const self = u.id === me().id, conn = self ? "" : V.peers.get(u.id)?.pc.connectionState;
+        return `<div class="voice-tile ${u.muted ? "muted" : ""}" data-vu="${F.esc(u.id)}"><div class="voice-av"><img src="${F.esc(u.avatar || F.avatar(u.wallet || u.id))}" alt=""></div>
+          <div class="voice-n">${F.esc(u.name || "Member")}${self ? " (you)" : ""}</div>
+          <div class="voice-s">${u.muted ? "🔇 muted" : V.joined && !self && conn && conn !== "connected" ? "connecting…" : "🎤"}</div></div>`; }).join("")
+        : `<div class="empty-state" style="padding:24px;grid-column:1/-1"><b>Nobody's talking yet</b>Join voice and your teammates will see you here.</div>`}</div>
+      <p class="note" style="margin-top:10px">Stay on this page while you talk — leaving the team page ends your call. Up to ${VMAX} people can talk at once.</p></div>`;
+    const j = F.$("#v-join"), mu = F.$("#v-mute"), lv = F.$("#v-leave");
+    if (j) j.onclick = voiceJoin; if (mu) mu.onclick = voiceMute; if (lv) lv.onclick = voiceLeave;
   }
 
   /* ================= boot ================= */
